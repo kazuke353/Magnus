@@ -7,18 +7,35 @@
     "dev": "remix vite:dev",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/server/index.js",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "build:android": "cap add android && cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^5.5.1",
+    "@capacitor/core": "^5.5.1",
     "@remix-run/node": "*",
     "@remix-run/react": "*",
     "@remix-run/serve": "*",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.2.2",
+    "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
     "isbot": "^4.1.0",
+    "openai": "^4.20.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^4.12.0",
+    "remix-auth": "^3.6.0",
+    "remix-auth-form": "^1.4.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^5.5.1",
     "@remix-run/dev": "*",
+    "@types/bcryptjs": "^2.4.6",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "^6.7.4",

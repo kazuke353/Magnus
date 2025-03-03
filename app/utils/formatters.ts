@@ -1,7 +1,9 @@
-export function formatCurrency(amount: number, currency = "USD"): string {
+export function formatCurrency(amount: number, currency: string = "BGN"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
@@ -13,13 +15,7 @@ export function formatPercentage(value: number): string {
   }).format(value / 100);
 }
 
-export function formatDate(date: Date | string): string {
-  if (typeof date === "string") {
-    date = new Date(date);
-  }
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + "...";
 }

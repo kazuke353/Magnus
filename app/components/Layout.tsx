@@ -1,177 +1,124 @@
-import { Link, NavLink, useLocation } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { Link, useLocation } from "@remix-run/react";
+import { useState } from "react";
+import { FiMenu, FiX, FiHome, FiSettings, FiMessageSquare, FiCalendar, FiPieChart } from "react-icons/fi";
+import { User } from "~/db/schema";
 
 interface LayoutProps {
+  user: User;
   children: React.ReactNode;
 }
 
-export default function Layout({ children }: LayoutProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export default function Layout({ user, children }: LayoutProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  const navigation = [
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "Tasks", href: "/tasks" },
-    { name: "Chat", href: "/chat" },
-    { name: "Settings", href: "/settings" },
-  ];
-
+  
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+  
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+  
+  const isActive = (path: string) => {
+    return location.pathname.startsWith(path) ? "bg-blue-700 text-white" : "text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900";
+  };
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu overlay */}
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+      {/* Mobile menu button */}
+      <button
+        className="fixed top-4 left-4 z-50 md:hidden text-gray-700 dark:text-gray-200 focus:outline-none"
+        onClick={toggleMenu}
+      >
+        {isMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+      </button>
+      
+      {/* Sidebar */}
       <div
-        className={`fixed inset-0 bg-gray-600 bg-opacity-75 z-30 transition-opacity duration-300 ${
-          isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setIsMobileMenuOpen(false)}
-      ></div>
-
-      {/* Mobile menu */}
-      <div
-        className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:hidden`}
+        className={`fixed inset-y-0 left-0 transform ${
+          isMenuOpen ? "translate-x-0" : "-translate-x-full"
+        } md:relative md:translate-x-0 z-40 w-64 bg-white dark:bg-gray-800 shadow-lg transition-transform duration-300 ease-in-out`}
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between px-4 py-5 border-b border-gray-200">
-            <Link to="/" className="text-xl font-bold text-blue-600">
-              Portfolio Manager
-            </Link>
-            <button
-              type="button"
-              className="text-gray-500 hover:text-gray-700"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <span className="sr-only">Close menu</span>
-              <svg
-                className="h-6 w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+          <div className="flex items-center justify-center h-16 border-b border-gray-200 dark:border-gray-700">
+            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">FinanceTracker</h1>
           </div>
-          <nav className="flex-1 px-4 py-4 overflow-y-auto">
-            <ul className="space-y-2">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <NavLink
-                    to={item.href}
-                    className={({ isActive }) =>
-                      `block px-4 py-2 rounded-md text-base font-medium transition-colors ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700"
-                          : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                      }`
-                    }
-                  >
-                    {item.name}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
+          
+          <nav className="flex-1 px-2 py-4 space-y-1">
+            <Link
+              to="/dashboard"
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive('/dashboard')}`}
+              onClick={closeMenu}
+            >
+              <FiHome className="mr-3 h-5 w-5" />
+              Dashboard
+            </Link>
+            
+            <Link
+              to="/tasks"
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive('/tasks')}`}
+              onClick={closeMenu}
+            >
+              <FiCalendar className="mr-3 h-5 w-5" />
+              Tasks & Schedule
+            </Link>
+            
+            <Link
+              to="/chat"
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive('/chat')}`}
+              onClick={closeMenu}
+            >
+              <FiMessageSquare className="mr-3 h-5 w-5" />
+              Chat Assistant
+            </Link>
+            
+            <Link
+              to="/portfolio"
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive('/portfolio')}`}
+              onClick={closeMenu}
+            >
+              <FiPieChart className="mr-3 h-5 w-5" />
+              Portfolio
+            </Link>
+            
+            <Link
+              to="/settings"
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive('/settings')}`}
+              onClick={closeMenu}
+            >
+              <FiSettings className="mr-3 h-5 w-5" />
+              Settings
+            </Link>
           </nav>
-          <div className="border-t border-gray-200 p-4">
-            <Link
-              to="/logout"
-              className="block px-4 py-2 text-base font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-            >
-              Logout
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Static sidebar for desktop */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
-        <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
-          <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4">
-              <Link to="/" className="text-xl font-bold text-blue-600">
-                Portfolio Manager
-              </Link>
+          
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{user.username}</p>
+                <form action="/logout" method="post">
+                  <button
+                    type="submit"
+                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                  >
+                    Sign out
+                  </button>
+                </form>
+              </div>
             </div>
-            <nav className="mt-8 flex-1 px-4 bg-white space-y-2">
-              {navigation.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={({ isActive }) =>
-                    `group flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                    }`
-                  }
-                >
-                  {item.name}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-          <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-            <Link
-              to="/logout"
-              className="flex-shrink-0 w-full group block px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-            >
-              Logout
-            </Link>
           </div>
         </div>
       </div>
-
-      {/* Mobile header */}
-      <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between bg-white py-4 px-4 border-b border-gray-200 shadow-sm">
-        <button
-          type="button"
-          className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-          onClick={() => setIsMobileMenuOpen(true)}
-        >
-          <span className="sr-only">Open sidebar</span>
-          <svg
-            className="block h-6 w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </button>
-        <div className="flex-1 flex justify-center">
-          <Link to="/" className="text-xl font-bold text-blue-600">
-            Portfolio Manager
-          </Link>
-        </div>
-        <div className="w-10"></div> {/* Spacer to center the title */}
-      </div>
-
+      
       {/* Main content */}
-      <div className="lg:pl-64 flex flex-col flex-1">
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              {children}
-            </div>
-          </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          {children}
         </main>
       </div>
     </div>

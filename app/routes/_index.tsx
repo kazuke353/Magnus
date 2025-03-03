@@ -1,15 +1,15 @@
 import { redirect } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { getUserId } from "~/models/user.server";
+import { authenticator } from "~/services/auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const userId = await getUserId(request);
-  if (userId) {
+  const user = await authenticator.isAuthenticated(request);
+  
+  // If user is logged in, redirect to dashboard
+  if (user) {
     return redirect("/dashboard");
   }
+  
+  // Otherwise, redirect to login
   return redirect("/login");
-}
-
-export default function Index() {
-  return null;
 }

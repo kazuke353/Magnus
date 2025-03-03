@@ -1,183 +1,259 @@
+import { useLoaderData, useActionData, useSubmit, useNavigation, Form } from "@remix-run/react";
+import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
+import { authenticator } from "~/services/auth.server";
+import { addChatMessage, createChatSession, getChatMessages, getChatSessions } from "~/db/chat.server";
+import { generateChatResponse } from "~/services/openai.server";
 import { useState, useRef, useEffect } from "react";
-import { json } from "@remix-run/node";
-import { Form, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-
-import { requireAuth } from "~/utils/auth";
-import { createMessage, getUserMessages, getAIResponse } from "~/models/chat.server";
-import { getUserTasks } from "~/models/tasks.server";
 import Card from "~/components/Card";
 import Button from "~/components/Button";
+import Input from "~/components/Input";
+import ChatMessage from "~/components/ChatMessage";
+import { FiSend, FiPlus, FiMessageSquare } from "react-icons/fi";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const userId = await requireAuth(request);
-  const messages = await getUserMessages(userId);
-  const tasks = await getUserTasks(userId);
+  const user = await authenticator.isAuthenticated(request, {
+    failureRedirect: "/login",
+  });
   
-  return json({ messages, tasks });
+  const url = new URL(request.url);
+  const sessionId = url.searchParams.get("session");
+  
+  const sessions = await getChatSessions(user.id);
+  
+  let currentSession = null;
+  let messages = [];
+  
+  if (sessionId) {
+    // Get the specified session
+    currentSession = sessions.find(session => session.id === sessionId) || null;
+    
+    if (currentSession) {
+      messages = await getChatMessages(currentSession.id);
+    }
+  } else if (sessions.length > 0) {
+    // Get the most recent session
+    currentSession = sessions[0];
+    messages = await getChatMessages(currentSession.id);
+  }
+  
+  return json({ user, sessions, currentSession, messages });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const userId = await requireAuth(request);
+  const user = await authenticator.isAuthenticated(request, {
+    failureRedirect: "/login",
+  });
+  
   const formData = await request.formData();
-  const content = formData.get("message") as string;
+  const action = formData.get("_action") as string;
   
-  if (!content) {
-    return json({ error: "Message cannot be empty" }, { status: 400 });
+  try {
+    if (action === "send_message") {
+      let sessionId = formData.get("sessionId") as string;
+      const message = formData.get("message") as string;
+      
+      if (!message.trim()) {
+        return json({ error: "Message cannot be empty" });
+      }
+      
+      // Create a new session if needed
+      if (!sessionId) {
+        const title = message.length > 30 ? message.substring(0, 30) + "..." : message;
+        const session = await createChatSession(user.id, title);
+        sessionId = session.id;
+      }
+      
+      // Add user message
+      await addChatMessage(sessionId, user.id, message, "user");
+      
+      // Get previous messages for context
+      const messages = await getChatMessages(sessionId);
+      const previousMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // Generate AI response
+      const aiResponse = await generateChatResponse(user.id, message, previousMessages);
+      
+      // Add AI response
+      await addChatMessage(sessionId, user.id, aiResponse, "assistant");
+      
+      return json({ success: true, sessionId });
+    }
+    
+    if (action === "new_chat") {
+      const session = await createChatSession(user.id, "New Conversation");
+      return json({ success: true, sessionId: session.id });
+    }
+    
+    return json({ error: "Invalid action" }, { status: 400 });
+  } catch (error) {
+    return json({ error: (error as Error).message }, { status: 500 });
   }
-  
-  // Create user message
-  const userMessage = await createMessage(userId, content, true);
-  
-  // Get tasks for context
-  const tasks = await getUserTasks(userId);
-  
-  // Get AI response
-  const aiResponse = await getAIResponse(userId, content, tasks);
-  
-  return json({ userMessage, aiResponse });
 }
 
 export default function Chat() {
-  const { messages, tasks } = useLoaderData<typeof loader>();
+  const { user, sessions, currentSession, messages } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
+  const submit = useSubmit();
+  
   const [messageInput, setMessageInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Combine existing messages with new ones from action
-  const allMessages = [...messages];
-  if (actionData?.userMessage && !allMessages.find(m => m.id === actionData.userMessage.id)) {
-    allMessages.push(actionData.userMessage);
-  }
-  if (actionData?.aiResponse && !allMessages.find(m => m.id === actionData.aiResponse.id)) {
-    allMessages.push(actionData.aiResponse);
-  }
-  
-  // Sort messages by timestamp
-  allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [allMessages]);
-  
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    if (!messageInput.trim()) {
-      e.preventDefault();
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
+  }, [messages]);
+  
+  // Redirect to new session if created
+  useEffect(() => {
+    if (actionData?.success && actionData.sessionId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("session", actionData.sessionId);
+      window.history.pushState({}, "", url.toString());
+    }
+  }, [actionData]);
+  
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!messageInput.trim()) return;
+    
+    const formData = new FormData();
+    formData.append("_action", "send_message");
+    if (currentSession) {
+      formData.append("sessionId", currentSession.id);
+    }
+    formData.append("message", messageInput);
+    
+    submit(formData, { method: "post" });
+    setMessageInput("");
   };
   
+  const handleNewChat = () => {
+    const formData = new FormData();
+    formData.append("_action", "new_chat");
+    submit(formData, { method: "post" });
+  };
+  
+  const isSubmitting = navigation.state === "submitting";
+  
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Chat Assistant</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Ask questions about your portfolio, tasks, or schedule
-        </p>
+    <div className="h-[calc(100vh-8rem)] flex flex-col">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Chat Assistant</h1>
+          <p className="text-gray-600 dark:text-gray-400">Ask questions about your finances, tasks, or get help with planning.</p>
+        </div>
+        
+        <Button onClick={handleNewChat}>
+          <FiPlus className="mr-2" />
+          New Chat
+        </Button>
       </div>
       
-      <Card className="p-0 overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-          <h2 className="text-white font-medium">Portfolio Assistant</h2>
-          <p className="text-blue-100 text-sm">Ask me anything about your investments or tasks</p>
-        </div>
-        
-        <div 
-          ref={chatContainerRef}
-          className="h-[calc(100vh-320px)] overflow-y-auto p-6 bg-gray-50"
-        >
-          {allMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="bg-blue-100 rounded-full p-4 mb-4">
-                <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-1">Start a conversation</h3>
-              <p className="text-gray-500 max-w-sm">
-                Ask about your portfolio performance, upcoming tasks, or investment advice.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {allMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}
-                >
-                  {!message.isUser && (
-                    <div className="flex-shrink-0 mr-3">
-                      <div className="bg-blue-600 rounded-full h-8 w-8 flex items-center justify-center">
-                        <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    className={`max-w-xs sm:max-w-md md:max-w-lg rounded-2xl px-4 py-3 ${
-                      message.isUser
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-gray-800 shadow-sm border border-gray-100"
+      <div className="flex flex-1 gap-4 overflow-hidden">
+        {/* Chat sessions sidebar */}
+        <div className="hidden md:block w-64 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="font-medium text-gray-900 dark:text-gray-100">Conversations</h2>
+          </div>
+          <div className="p-2">
+            {sessions.length > 0 ? (
+              <div className="space-y-1">
+                {sessions.map((session) => (
+                  <a
+                    key={session.id}
+                    href={`/chat?session=${session.id}`}
+                    className={`block px-3 py-2 rounded-md text-sm ${
+                      currentSession?.id === session.id
+                        ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    <p className={`text-xs mt-1 ${message.isUser ? "text-blue-200" : "text-gray-400"}`}>
-                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  {message.isUser && (
-                    <div className="flex-shrink-0 ml-3">
-                      <div className="bg-gray-200 rounded-full h-8 w-8 flex items-center justify-center">
-                        <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
+                    <div className="flex items-center">
+                      <FiMessageSquare className="mr-2 flex-shrink-0" />
+                      <span className="truncate">{session.title}</span>
                     </div>
-                  )}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                No conversations yet
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="border-t border-gray-200 p-4 bg-white">
-          <Form method="post" onSubmit={handleSubmit}>
-            <div className="flex items-center">
-              <input
-                type="text"
+        {/* Chat area */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {messages.length > 0 ? (
+              <div>
+                {messages.map((message) => (
+                  <ChatMessage
+                    key={message.id}
+                    content={message.content}
+                    role={message.role}
+                    createdAt={message.createdAt}
+                  />
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <FiMessageSquare className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  Welcome to the Chat Assistant
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md">
+                  Ask questions about your finances, get help with tasks, or inquire about your schedule.
+                </p>
+              </div>
+            )}
+            
+            {isSubmitting && (
+              <div className="flex justify-start mb-4">
+                <div className="max-w-[80%] bg-gray-200 dark:bg-gray-700 rounded-lg px-4 py-2 shadow">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Input area */}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <Form onSubmit={handleSendMessage} className="flex space-x-2">
+              <Input
+                id="message"
                 name="message"
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 rounded-l-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="flex-1"
                 disabled={isSubmitting}
               />
               <Button
                 type="submit"
-                variant="primary"
-                className="rounded-l-none rounded-r-full px-5"
-                disabled={isSubmitting || !messageInput.trim()}
+                disabled={!messageInput.trim() || isSubmitting}
+                isLoading={isSubmitting}
               >
-                {isSubmitting ? (
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                )}
+                <FiSend />
               </Button>
-            </div>
-          </Form>
+            </Form>
+          </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
