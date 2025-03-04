@@ -23,44 +23,42 @@ const RegisterSchema = z.object({
   path: ["confirmPassword"]
 });
 
+// register.tsx (Attempt 7 - Modified action)
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const username = formData.get("username") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
-  
+
   try {
-    // Validate form data
+    // 1. Validate form data using Zod (Validation back in action)
     const validatedData = RegisterSchema.parse({
       username,
       email,
       password,
       confirmPassword
     });
-    
-    // Check if username already exists
+
+    // 2. Check if username already exists
     const existingUser = await getUserByUsername(username);
     if (existingUser) {
-      return json({ error: "Username already exists" });
+      return json({ error: "Username already exists" }, { status: 400 });
     }
-    
-    // Create user
+
+    // 3. Create user in database
     await createUser(username, email, password);
-    
-    // Log in the user
-    return await authenticator.authenticate("user-pass", request, {
-      successRedirect: "/dashboard",
-      context: { formData: new FormData(request.body as any) },
-      throwOnError: true,
-    });
+
+    // 4. Redirect to login page after successful registration (NO auto-login here)
+    return redirect("/login?success=registered"); // Redirect to login with success message (optional)
+
   } catch (error) {
     if (error instanceof z.ZodError) {
       const fieldErrors = error.flatten().fieldErrors;
-      return json({ fieldErrors });
+      return json({ fieldErrors }, { status: 400 });
     }
-    
-    return json({ error: (error as Error).message });
+    // Generic error handling for registration failures
+    return json({ error: "Registration failed: " + (error as Error).message }, { status: 500 });
   }
 }
 

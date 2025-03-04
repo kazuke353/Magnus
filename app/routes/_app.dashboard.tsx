@@ -1,18 +1,18 @@
-import { useLoaderData } from "@remix-run/react";
-import { LoaderFunctionArgs, json } from "@remix-run/node";
+import { useLoaderData, Link } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "@remix-run/node"; // Use 'type' import
+import { json } from "@remix-run/node";
 import { authenticator } from "~/services/auth.server";
-import { getUserTasks } from "~/db/tasks.server";
-import { fetchPortfolioData } from "~/services/portfolio.server";
+import { getUserTasks, Task } from "~/db/tasks.server";
+import { getPortfolioData, PortfolioData } from "~/services/portfolio.server"; // Import PortfolioData type
 import Card from "~/components/Card";
 import { FiCalendar, FiDollarSign, FiPieChart, FiMessageSquare } from "react-icons/fi";
-import { Link } from "@remix-run/react";
 import { formatDate } from "~/utils/date";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly type LoaderFunctionArgs
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
-  
+
   // Get upcoming tasks
   const tasks = await getUserTasks(user.id);
   const upcomingTasks = tasks
@@ -23,27 +23,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     })
     .slice(0, 5);
-  
+
   // Get portfolio data
-  const portfolioData = await fetchPortfolioData(user.settings);
-  
+  const portfolioData = await getPortfolioData(user.id);
+
   return json({
     user,
     upcomingTasks,
-    portfolioData,
+    portfolioData, // portfolioData can be null now
   });
+};
+
+interface DashboardLoaderData { // Define interface for loader data
+  user: Awaited<ReturnType<typeof authenticator.isAuthenticated>>;
+  upcomingTasks: Task[];
+  portfolioData: PortfolioData | null; // portfolioData can be null
 }
 
+
 export default function Dashboard() {
-  const { user, upcomingTasks, portfolioData } = useLoaderData<typeof loader>();
-  
+  const { user, upcomingTasks, portfolioData } = useLoaderData<DashboardLoaderData>(); // Use the defined interface
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Welcome, {user.username}!</h1>
         <p className="text-gray-600 dark:text-gray-400">Here's an overview of your financial portfolio and upcoming tasks.</p>
       </div>
-      
+
       {/* Stats overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20">
@@ -54,30 +61,30 @@ export default function Dashboard() {
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Invested</h3>
               <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {user.settings.currency} {portfolioData.overallSummary.totalInvestedOverall.toFixed(2)}
+                {user.settings.currency} {portfolioData?.overallSummary?.totalInvestedOverall?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
               </p>
             </div>
           </div>
         </Card>
-        
-        <Card className={`${portfolioData.overallSummary.totalResultOverall >= 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-red-50 dark:bg-red-900'} dark:bg-opacity-20`}>
+
+        <Card className={`${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-red-50 dark:bg-red-900'} dark:bg-opacity-20`}>
           <div className="flex items-center">
-            <div className={`p-3 rounded-full ${portfolioData.overallSummary.totalResultOverall >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'}`}>
-              <FiPieChart className={`h-6 w-6 ${portfolioData.overallSummary.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
+            <div className={`p-3 rounded-full ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'}`}>
+              <FiPieChart className={`h-6 w-6 ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
             </div>
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Return</h3>
-              <p className={`text-lg font-semibold ${portfolioData.overallSummary.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {portfolioData.overallSummary.totalResultOverall >= 0 ? '+' : ''}
-                {user.settings.currency} {portfolioData.overallSummary.totalResultOverall.toFixed(2)}
+              <p className={`text-lg font-semibold ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {portfolioData?.overallSummary?.totalResultOverall >= 0 ? '+' : ''}
+                {user.settings.currency} {portfolioData?.overallSummary?.totalResultOverall?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
                 {' '}
-                ({portfolioData.overallSummary.returnPercentageOverall >= 0 ? '+' : ''}
-                {portfolioData.overallSummary.returnPercentageOverall.toFixed(2)}%)
+                ({portfolioData?.overallSummary?.returnPercentageOverall >= 0 ? '+' : ''}
+                {portfolioData?.overallSummary?.returnPercentageOverall?.toFixed(2) ?? 'N/A'}%) {/* Handle null portfolioData */}
               </p>
             </div>
           </div>
         </Card>
-        
+
         <Card className="bg-purple-50 dark:bg-purple-900 dark:bg-opacity-20">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-800">
@@ -91,7 +98,7 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
-        
+
         <Card className="bg-yellow-50 dark:bg-yellow-900 dark:bg-opacity-20">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-800">
@@ -106,7 +113,7 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
-      
+
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upcoming tasks */}
@@ -145,7 +152,7 @@ export default function Dashboard() {
             </Link>
           </div>
         </Card>
-        
+
         {/* Portfolio summary */}
         <Card title="Portfolio Summary">
           <div className="space-y-4">
@@ -153,30 +160,34 @@ export default function Dashboard() {
               <div>
                 <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Cash Available</h4>
                 <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {user.settings.currency} {portfolioData.deposit_info.freeCashAvailable.toFixed(2)}
+                  {user.settings.currency} {portfolioData?.deposit_info?.freeCashAvailable?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
                 </p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Next Deposit</h4>
                 <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {formatDate(portfolioData.deposit_info.expectedDepositDate)}
+                  {portfolioData?.deposit_info?.expectedDepositDate ? formatDate(portfolioData.deposit_info.expectedDepositDate) : 'N/A'} {/* Handle null portfolioData */}
                 </p>
               </div>
             </div>
-            
+
             <div>
               <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Allocation Differences</h4>
               <div className="space-y-2">
-                {Object.entries(portfolioData.allocation_analysis.allocationDifferences).map(([portfolio, difference]) => (
-                  <div key={portfolio} className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{portfolio}</span>
-                    <span className={`text-sm font-medium ${
-                      difference.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                    }`}>
-                      {difference}
-                    </span>
-                  </div>
-                ))}
+                {portfolioData?.allocation_analysis?.allocationDifferences && // Conditionally render allocation differences
+                  Object.entries(portfolioData.allocation_analysis.allocationDifferences).map(([portfolio, difference]) => (
+                    <div key={portfolio} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{portfolio}</span>
+                      <span className={`text-sm font-medium ${
+                        difference.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {difference}
+                      </span>
+                    </div>
+                  ))}
+                   {!portfolioData?.allocation_analysis?.allocationDifferences && ( // Message if no allocation differences
+                      <p className="text-gray-500 dark:text-gray-400">Allocation analysis not available.</p>
+                   )}
               </div>
             </div>
           </div>
@@ -190,7 +201,7 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
-      
+
       {/* Chat assistant promo */}
       <Card className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
         <div className="flex items-center justify-between">

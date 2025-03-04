@@ -1,5 +1,6 @@
 import { getDb } from './database.server';
 import { Task } from './schema';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function createTask(
   userId: string,
@@ -7,7 +8,7 @@ export async function createTask(
 ): Promise<Task> {
   const db = await getDb();
   const now = new Date().toISOString();
-  const id = crypto.randomUUID();
+  const id = uuidv4();
 
   await db.run(
     `INSERT INTO tasks (

@@ -16,6 +16,8 @@
     "@remix-run/node": "*",
     "@remix-run/react": "*",
     "@remix-run/serve": "*",
+    "@remix-run/css-bundle": "*",
+    "uuid": "11.1.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.2.2",
     "chart.js": "^4.4.0",

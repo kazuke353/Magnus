@@ -11,13 +11,15 @@ interface PortfolioChartProps {
 export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
   // Extract data for the pie chart
   const portfolioNames = Object.keys(portfolioData.allocation_analysis.currentAllocation);
-  
+
   // Extract percentages from strings like "978.98 BGN [50.54%]"
   const currentAllocationValues = Object.values(portfolioData.allocation_analysis.currentAllocation).map(value => {
     const percentMatch = value.match(/\[(.*?)%\]/);
     return percentMatch ? parseFloat(percentMatch[1]) : 0;
   });
-  
+
+  console.log("currentAllocationValues:", currentAllocationValues); // <-- ADD THIS LOG
+
   const data = {
     labels: portfolioNames,
     datasets: [
@@ -42,7 +44,7 @@ export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
       },
     ],
   };
-  
+
   const options = {
     responsive: true,
     plugins: {
@@ -51,8 +53,7 @@ export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
         labels: {
           color: 'rgb(107, 114, 128)',
           font: {
-            size: 12
-          }
+            size: 12 }
         }
       },
       tooltip: {
@@ -64,7 +65,7 @@ export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
       }
     },
   };
-  
+
   return (
     <div className="h-64">
       <Pie data={data} options={options} />

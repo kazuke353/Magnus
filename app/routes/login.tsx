@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { authenticator } from "~/services/auth.server";
+import { getSession, commitSession } from "~/services/session.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 
@@ -13,11 +14,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    return await authenticator.authenticate("user-pass", request, {
-      successRedirect: "/dashboard",
+    console.log("Login action: Attempting authenticator.authenticate...");
+    const user = await authenticator.authenticate("user-pass", request, { // **REMOVE successRedirect**
       throwOnError: true,
     });
+    console.log("Login action: authenticator.authenticate call completed successfully. User:", user);
+
+    // **MANUALLY CREATE REDIRECT RESPONSE**
+    const session = await getSession(); // Get session
+    session.set(authenticator.sessionKey, user); // Set user in session
+    const headers = new Headers(); // Create headers
+    headers.set("Set-Cookie", await commitSession(session)); // Commit session and set cookie header
+
+    console.log("Login action: Manual redirect to /dashboard with session cookie.");
+    return redirect("/dashboard", { headers }); // Return manual redirect response
+
   } catch (error) {
+    console.error("Login action: authenticator.authenticate error:", error);
     return json({ error: (error as Error).message });
   }
 }

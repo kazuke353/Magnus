@@ -1,10 +1,11 @@
 import { getDb } from './database.server';
 import { ChatMessage, ChatSession } from './schema';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function createChatSession(userId: string, title: string): Promise<ChatSession> {
   const db = await getDb();
   const now = new Date().toISOString();
-  const id = crypto.randomUUID();
+  const id = uuidv4();
 
   await db.run(
     'INSERT INTO chat_sessions (id, userId, title, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
@@ -41,7 +42,7 @@ export async function addChatMessage(
 ): Promise<ChatMessage> {
   const db = await getDb();
   const now = new Date().toISOString();
-  const id = crypto.randomUUID();
+  const id = uuidv4();
 
   await db.run(
     'INSERT INTO chat_messages (id, userId, sessionId, content, role, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
