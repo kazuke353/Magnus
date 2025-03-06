@@ -1,6 +1,6 @@
 import { useLoaderData, useActionData, useSubmit, useNavigation, Form } from "@remix-run/react";
 import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 import { addChatMessage, createChatSession, getChatMessages, getChatSessions } from "~/db/chat.server";
 import { generateChatResponse } from "~/services/openai.server";
 import { useState, useRef, useEffect } from "react";
@@ -11,9 +11,7 @@ import ChatMessage from "~/components/ChatMessage";
 import { FiSend, FiPlus, FiMessageSquare } from "react-icons/fi";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session");
@@ -40,9 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   const formData = await request.formData();
   const action = formData.get("_action") as string;

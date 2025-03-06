@@ -2,19 +2,21 @@ import { getDb } from './database.server';
 import { Task } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
-export async function createTask(
+export function createTask(
   userId: string,
   taskData: Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed'>
-): Promise<Task> {
-  const db = await getDb();
+): Task {
+  const db = getDb();
   const now = new Date().toISOString();
   const id = uuidv4();
 
-  await db.run(
-    `INSERT INTO tasks (
-      id, userId, title, description, dueDate, completed, category, priority, amount, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
+  try {
+    const insertStmt = db.prepare(
+      `INSERT INTO tasks (
+        id, userId, title, description, dueDate, completed, category, priority, amount, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertStmt.run(
       id,
       userId,
       taskData.title,
@@ -26,77 +28,109 @@ export async function createTask(
       taskData.amount || null,
       now,
       now
-    ]
-  );
+    );
 
-  return getTaskById(id);
-}
+    return getTaskById(id);
 
-export async function getTaskById(id: string): Promise<Task> {
-  const db = await getDb();
-  const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
-  
-  if (!task) {
-    throw new Error(`Task with id ${id} not found`);
+  } catch (error) {
+    console.error("Error in createTask:", error);
+    throw error;
   }
-  
-  return {
-    ...task,
-    completed: Boolean(task.completed)
-  };
 }
 
-export async function getUserTasks(userId: string): Promise<Task[]> {
-  const db = await getDb();
-  const tasks = await db.all('SELECT * FROM tasks WHERE userId = ? ORDER BY dueDate ASC, createdAt DESC', userId);
-  
-  return tasks.map(task => ({
-    ...task,
-    completed: Boolean(task.completed)
-  }));
+export function getTaskById(id: string): Task {
+  const db = getDb();
+  try {
+    const stmt = db.prepare('SELECT * FROM tasks WHERE id = ?');
+    const task = stmt.get(id) as Task | undefined;
+
+    if (!task) {
+      throw new Error(`Task with id ${id} not found`);
+    }
+
+    return {
+      ...task,
+      completed: Boolean(task.completed)
+    };
+  } catch (error) {
+    console.error("getTaskById: Error during database interaction:", error);
+    throw error; // Or handle differently based on your error handling policy
+  }
 }
 
-export async function getTasksByDateRange(userId: string, startDate: string, endDate: string): Promise<Task[]> {
-  const db = await getDb();
-  const tasks = await db.all(
-    'SELECT * FROM tasks WHERE userId = ? AND dueDate >= ? AND dueDate <= ? ORDER BY dueDate ASC',
-    [userId, startDate, endDate]
-  );
-  
-  return tasks.map(task => ({
-    ...task,
-    completed: Boolean(task.completed)
-  }));
+export function getUserTasks(userId: string): Task[] {
+  const db = getDb();
+  try {
+    const stmt = db.prepare('SELECT * FROM tasks WHERE userId = ? ORDER BY dueDate ASC, createdAt DESC');
+    const tasks = stmt.all(userId) as Task[];
+
+    return tasks.map(task => ({
+      ...task,
+      completed: Boolean(task.completed)
+    }));
+  } catch (error) {
+    console.error("getUserTasks: Error during database interaction:", error);
+    return []; // Or throw error, depending on how you want to handle failures
+  }
 }
 
-export async function updateTask(id: string, taskData: Partial<Task>): Promise<Task> {
-  const db = await getDb();
+export function getTasksByDateRange(userId: string, startDate: string, endDate: string): Task[] {
+  const db = getDb();
+  try {
+    const stmt = db.prepare(
+      'SELECT * FROM tasks WHERE userId = ? AND dueDate >= ? AND dueDate <= ? ORDER BY dueDate ASC'
+    );
+    const tasks = stmt.all(userId, startDate, endDate) as Task[];
+
+    return tasks.map(task => ({
+      ...task,
+      completed: Boolean(task.completed)
+    }));
+  } catch (error) {
+    console.error("getTasksByDateRange: Error during database interaction:", error);
+    return []; // Or throw error, depending on your error handling
+  }
+}
+
+export function updateTask(id: string, taskData: Partial<Task>): Task {
+  const db = getDb();
   const now = new Date().toISOString();
-  
-  const currentTask = await getTaskById(id);
-  
-  const updatedTask = {
-    ...currentTask,
-    ...taskData,
-    updatedAt: now,
-    completed: taskData.completed !== undefined ? taskData.completed : currentTask.completed
-  };
-  
-  const { id: taskId, userId, createdAt, ...dataToUpdate } = updatedTask;
-  
-  const keys = Object.keys(dataToUpdate);
-  const placeholders = keys.map(() => '?').join(', ');
-  const setClause = keys.map(key => `${key} = ?`).join(', ');
-  
-  await db.run(
-    `UPDATE tasks SET ${setClause} WHERE id = ?`,
-    [...Object.values(dataToUpdate), taskId]
-  );
-  
-  return getTaskById(id);
+
+  try {
+    const currentTask = getTaskById(id);
+
+    const updatedTask = {
+      ...currentTask,
+      ...taskData,
+      updatedAt: now,
+      completed: taskData.completed !== undefined ? taskData.completed : currentTask.completed
+    };
+
+    const { id: taskId, userId, createdAt, ...dataToUpdate } = updatedTask;
+
+    const keys = Object.keys(dataToUpdate);
+    const setClause = keys.map(key => `${key} = ?`).join(', ');
+
+    const updateStmt = db.prepare(
+      `UPDATE tasks SET ${setClause} WHERE id = ?`
+    );
+    updateStmt.run(...Object.values(dataToUpdate), taskId);
+
+    return getTaskById(id);
+
+  } catch (error) {
+    console.error("updateTask: Error during database interaction:", error);
+    throw error;
+  }
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  const db = await getDb();
-  await db.run('DELETE FROM tasks WHERE id = ?', id);
+export function deleteTask(id: string): void {
+  const db = getDb();
+  try {
+    const deleteStmt = db.prepare('DELETE FROM tasks WHERE id = ?');
+    deleteStmt.run(id);
+  } catch (error) {
+    console.error("deleteTask: Error during database interaction:", error);
+    throw error; // Or handle error as needed (e.g., log and return void)
+  }
 }

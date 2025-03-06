@@ -1,58 +1,21 @@
 import { cssBundleHref } from "@remix-run/css-bundle";
-import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Links,
-  LiveReload,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useLoaderData,
-} from "@remix-run/react";
-import { json } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
-import { useEffect } from "react";
-import { getThemeClass } from "~/utils/theme";
-import tailwindStylesheetUrl from "./tailwind.css";
+import type { LinksFunction } from "@remix-run/node";
+import { Links, LiveReload, Meta, Outlet, Scripts, ScrollRestoration } from "@remix-run/react";
+
+const tailwindStylesheetUrl = "./app/tailwind.css";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwindStylesheetUrl },
   ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
   { rel: "icon", href: "/favicon.ico" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+  },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request);
-  
-  return json({
-    user,
-    ENV: {
-      NODE_ENV: process.env.NODE_ENV,
-    },
-  });
-}
-
 export default function App() {
-  const { user } = useLoaderData<typeof loader>();
-  
-  // Apply theme class to document
-  useEffect(() => {
-    if (user?.settings?.theme) {
-      const theme = user.settings.theme;
-      const themeClass = getThemeClass(theme as any);
-      
-      // Remove existing theme classes
-      document.documentElement.classList.remove('light', 'dark');
-      
-      // Add the appropriate theme class
-      document.documentElement.classList.add(themeClass);
-    } else {
-      // Default to light theme if no user or no theme setting
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
-    }
-  }, [user?.settings?.theme]);
-  
   return (
     <html lang="en" className="h-full">
       <head>
@@ -65,7 +28,6 @@ export default function App() {
         <Outlet />
         <ScrollRestoration />
         <Scripts />
-        <LiveReload />
       </body>
     </html>
   );

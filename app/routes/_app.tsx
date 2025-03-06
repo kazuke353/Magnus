@@ -1,35 +1,30 @@
+// _app.tsx
 import { Outlet, useLoaderData } from "@remix-run/react";
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { requireAuthentication } from "~/services/auth.server";
 import Layout from "~/components/Layout";
 import { useEffect } from "react";
 import { getThemeClass } from "~/utils/theme";
 
+// Loader to handle authentication and data loading for the root layout
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request);
-  
-  if (!user) {
-    return redirect("/login");
-  }
-  
-  return { user };
+  const user = await requireAuthentication(request);
+  return Response.json({ user });
 }
 
+
 export default function AppLayout() {
-  const { user } = useLoaderData<typeof loader>();
-  
+  const { user } = useLoaderData<typeof loader>()
+
   // Apply theme class to document
   useEffect(() => {
-    const theme = user.settings.theme || 'light';
+    const theme = user?.settings?.theme || 'light'; // Safe access, but user is guaranteed to be there by loader
     const themeClass = getThemeClass(theme as any);
-    
-    // Remove existing theme classes
+
     document.documentElement.classList.remove('light', 'dark');
-    
-    // Add the appropriate theme class
     document.documentElement.classList.add(themeClass);
-  }, [user.settings.theme]);
-  
+  }, [user?.settings?.theme]);
+
   return (
     <Layout user={user}>
       <Outlet />

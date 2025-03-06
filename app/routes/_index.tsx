@@ -1,9 +1,9 @@
 import { redirect } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request);
+  const user = await requireAuthentication(request);
   
   // If user is logged in, redirect to dashboard
   if (user) {

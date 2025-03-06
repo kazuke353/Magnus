@@ -2,7 +2,6 @@ import { UserSettings } from "~/db/schema";
 import { getDb } from '~/db/database.server';
 import { v4 as uuidv4 } from 'uuid';
 
-
 interface PortfolioInstrument {
   currentShare: number;
   expectedShare: number;
@@ -18,6 +17,11 @@ interface PortfolioInstrument {
   maxOpenQuantity: number;
   minTradeQuantity: number;
   type: "STOCK" | "ETF";
+  dividendYield: number;
+  performance_1week: number;
+  performance_1month: number;
+  performance_3months: number;
+  performance_1year: number;
 }
 
 interface Portfolio {
@@ -53,6 +57,7 @@ interface AllocationAnalysis {
   targetAllocation: Record<string, string>;
   currentAllocation: Record<string, string>;
   allocationDifferences: Record<string, string>;
+  estimatedAnnualDividend: number;
 }
 
 interface PlannedInvestment {
@@ -76,7 +81,7 @@ export async function fetchPortfolioData(settings: UserSettings, userId: string)
     const data = await response.json();
     const portfolioData = data as PortfolioData;
 
-    await savePortfolioData(userId, portfolioData); // **Save portfolio data to database**
+    savePortfolioData(userId, portfolioData); // **Save portfolio data to database (now synchronous)**
 
     return portfolioData;
   } catch (error) {
@@ -85,24 +90,24 @@ export async function fetchPortfolioData(settings: UserSettings, userId: string)
   }
 }
 
-// Function to save portfolio data for a user
-export async function savePortfolioData(userId: string, portfolioData: PortfolioData): Promise<void> {
-  const db = await getDb();
+// Function to save portfolio data for a user (now synchronous)
+export function savePortfolioData(userId: string, portfolioData: PortfolioData): void {
+  const db = getDb();
   const now = new Date().toISOString();
   const portfolioId = uuidv4(); // Generate a unique ID for the portfolio record
 
   try {
-    await db.run(
+    const insertStmt = db.prepare(
       `INSERT OR REPLACE INTO user_portfolios (id, userId, portfolioData, fetchDate, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        portfolioId,
-        userId,
-        JSON.stringify(portfolioData), // Serialize PortfolioData to JSON string
-        now,
-        now,
-        now
-      ]
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    insertStmt.run(
+      portfolioId,
+      userId,
+      JSON.stringify(portfolioData), // Serialize PortfolioData to JSON string
+      now,
+      now,
+      now
     );
   } catch (error) {
     console.error("Error saving portfolio data to database:", error);
@@ -111,15 +116,15 @@ export async function savePortfolioData(userId: string, portfolioData: Portfolio
 }
 
 
-// Function to get portfolio data for a user
-export async function getPortfolioData(userId: string): Promise<PortfolioData | null> {
-  const db = await getDb();
+// Function to get portfolio data for a user (now synchronous)
+export function getPortfolioData(userId: string): PortfolioData | null {
+  const db = getDb();
 
   try {
-    const result = await db.get(
-      'SELECT portfolioData FROM user_portfolios WHERE userId = ?',
-      userId
+    const stmt = db.prepare(
+      'SELECT portfolioData FROM user_portfolios WHERE userId = ?'
     );
+    const result = stmt.get(userId) as { portfolioData: string } | undefined; // Type assertion for get
 
     if (result && result.portfolioData) {
       return JSON.parse(result.portfolioData) as PortfolioData; // Deserialize JSON string to PortfolioData

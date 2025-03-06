@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.financetracker.app',
   appName: 'Finance Tracker',
-  webDir: 'public/build',
+  webDir: 'build/client', // <-- Change this line from 'public/build' to 'build/client'
   server: {
     androidScheme: 'https'
   },

@@ -13,6 +13,7 @@ module.exports = {
     commonjs: true,
     es6: true,
   },
+  ignorePatterns: ["!**/.server", "!**/.client"],
 
   // Base config
   extends: ["eslint:recommended"],
@@ -37,6 +38,9 @@ module.exports = {
           { name: "Link", linkAttribute: "to" },
           { name: "NavLink", linkAttribute: "to" },
         ],
+        "import/resolver": {
+          typescript: {},
+        },
       },
       rules: {
         "react/jsx-no-leaked-render": [

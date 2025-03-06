@@ -46,3 +46,4 @@ docs/instructions/Roadmap.md
 *.md
 *.db
 package-lock.json
+/android

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { isAuthenticated, commitSession } from "~/services/auth.server";
 import { createUser, getUserByUsername } from "~/db/user.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 import { z } from "zod";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request);
+  const user = await isAuthenticated(request);
   if (user) return redirect("/dashboard");
   return null;
 }
@@ -47,10 +47,13 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // 3. Create user in database
-    await createUser(username, email, password);
+    const user = await createUser(username, email, password);
+    const session = await commitSession(request, user)
 
     // 4. Redirect to login page after successful registration (NO auto-login here)
-    return redirect("/login?success=registered"); // Redirect to login with success message (optional)
+    return redirect("/dashboard", {
+      headers: { "Set-Cookie":  session},
+    });
 
   } catch (error) {
     if (error instanceof z.ZodError) {

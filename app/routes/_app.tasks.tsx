@@ -1,6 +1,6 @@
 import { useLoaderData, useActionData, useSubmit, useNavigation } from "@remix-run/react";
 import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 import { createTask, deleteTask, getUserTasks, updateTask } from "~/db/tasks.server";
 import { Task } from "~/db/schema";
 import { useState } from "react";
@@ -11,9 +11,7 @@ import TaskForm from "~/components/TaskForm";
 import { FiPlus, FiFilter, FiCalendar, FiList } from "react-icons/fi";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   const tasks = await getUserTasks(user.id);
   
@@ -21,9 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   const formData = await request.formData();
   const action = formData.get("_action") as string;

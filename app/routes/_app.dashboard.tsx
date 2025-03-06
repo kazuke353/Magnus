@@ -1,7 +1,7 @@
 import { useLoaderData, Link } from "@remix-run/react";
 import type { LoaderFunctionArgs } from "@remix-run/node"; // Use 'type' import
 import { json } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 import { getUserTasks, Task } from "~/db/tasks.server";
 import { getPortfolioData, PortfolioData } from "~/services/portfolio.server"; // Import PortfolioData type
 import Card from "~/components/Card";
@@ -9,9 +9,7 @@ import { FiCalendar, FiDollarSign, FiPieChart, FiMessageSquare } from "react-ico
 import { formatDate } from "~/utils/date";
 
 export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly type LoaderFunctionArgs
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
 
   // Get upcoming tasks
   const tasks = await getUserTasks(user.id);
@@ -35,7 +33,7 @@ export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly
 };
 
 interface DashboardLoaderData { // Define interface for loader data
-  user: Awaited<ReturnType<typeof authenticator.isAuthenticated>>;
+  user: Awaited<ReturnType<typeof requireAuthentication>>;
   upcomingTasks: Task[];
   portfolioData: PortfolioData | null; // portfolioData can be null
 }

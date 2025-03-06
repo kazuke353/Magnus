@@ -1,6 +1,6 @@
 import { useLoaderData, useSubmit, useNavigation, Link, json, } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node"; // Use 'type' import
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 import { fetchPortfolioData, PortfolioData, getPortfolioData, savePortfolioData } from "~/services/portfolio.server"; // Keep these imports in loader/action
 import Card from "~/components/Card";
 import Button from "~/components/Button";
@@ -11,9 +11,7 @@ import { useState, useEffect } from "react"; // Import useState and useEffect
 
 // Loader function to fetch user and initial portfolio data
 export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly type LoaderFunctionArgs
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
 
   let portfolioData: PortfolioData | null = null; // Initialize portfolioData
 
@@ -43,9 +41,7 @@ export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly
 
 // Action function to handle refresh button (no changes needed from previous version)
 export const action: ActionFunctionArgs = async ({ request }) => { // Explicitly type ActionFunctionArgs
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
 
   const formData = await request.formData();
   const actionType = formData.get("_action"); // Use a more descriptive name
@@ -183,6 +179,19 @@ export default function Portfolio() {
                   {user.settings.currency} {portfolioData.deposit_info.freeCashAvailable.toFixed(2)}
                 </p>
               </div>
+            </div>
+          </Card>
+          <Card className="bg-teal-50 dark:bg-teal-900 dark:bg-opacity-20 shadow-md rounded-xl p-4"> {/* New card for dividends */}
+            <div className="flex items-center">
+                <div className="p-4 rounded-full bg-teal-100 dark:bg-teal-800">
+                    <FiDollarSign className="h-6 w-6 text-teal-600 dark:text-teal-400" /> {/* Choose a relevant icon */}
+                </div>
+                <div className="ml-5">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Est. Annual Dividends</h3>
+                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                        {user.settings.currency} {portfolioData.allocation_analysis.estimatedAnnualDividend.toFixed(2)} {/* Display calculated dividend */}
+                    </p>
+                </div>
             </div>
           </Card>
         </div>

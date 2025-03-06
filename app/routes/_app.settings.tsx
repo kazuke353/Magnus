@@ -1,6 +1,6 @@
 import { useLoaderData, useActionData, Form, useNavigation } from "@remix-run/react";
 import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { authenticator } from "~/services/auth.server";
+import { requireAuthentication } from "~/services/auth.server";
 import { updateUserSettings } from "~/db/user.server";
 import Card from "~/components/Card";
 import Input from "~/components/Input";
@@ -16,17 +16,13 @@ const SettingsSchema = z.object({
 });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   return json({ user });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await requireAuthentication(request, "/login");
   
   const formData = await request.formData();
   const country = formData.get("country") as string;
