@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { authenticator, isAuthenticated } from "~/services/auth.server";
-import { getSession, commitSession } from "~/services/session.server";
+import { authenticator, isAuthenticated, commitSession } from "~/services/auth.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 
