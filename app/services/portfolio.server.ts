@@ -1,97 +1,28 @@
 import { UserSettings } from "~/db/schema";
 import { getDb } from '~/db/database.server';
 import { v4 as uuidv4 } from 'uuid';
+import { fetchPortfolioData as fetchPortfolioDataFromFetcher, PerformanceMetrics } from '~/utils/portfolio_fetcher'; // Import the new fetchPortfolioData
 
-interface PortfolioInstrument {
-  currentShare: number;
-  expectedShare: number;
-  issues: string[];
-  ownedQuantity: number;
-  ticker: string;
-  investedValue: number;
-  currentValue: number;
-  resultValue: number;
-  fullName: string;
-  addedToMarket: string;
-  currencyCode: string;
-  maxOpenQuantity: number;
-  minTradeQuantity: number;
-  type: "STOCK" | "ETF";
-  dividendYield: number;
-  performance_1week: number;
-  performance_1month: number;
-  performance_3months: number;
-  performance_1year: number;
-}
-
-interface Portfolio {
-  name: string;
-  creationDate: number;
-  dividendCashAction: string;
-  instruments: PortfolioInstrument[];
-  totalInvested: number;
-  totalResult: number;
-  returnPercentage: number;
-  totalInvestedOverall: number;
-  totalResultOverall: number;
-  fetchDate: string;
-}
-
-interface OverallSummary {
-  totalInvestedOverall: number;
-  totalResultOverall: number;
-  returnPercentageOverall: number;
-  fetchDate: string;
-}
-
-interface DepositInfo {
-  totalDepositedThisMonth: number;
-  budgetMetThisMonth: string;
-  expectedDepositDate: string;
-  expectedDepositMessage: string;
-  freeCashAvailable: number;
-  totalCash: number;
-}
-
-interface AllocationAnalysis {
-  targetAllocation: Record<string, string>;
-  currentAllocation: Record<string, string>;
-  allocationDifferences: Record<string, string>;
-  estimatedAnnualDividend: number;
-}
-
-interface PlannedInvestment {
-  [key: string]: number;
-}
-
-export interface PortfolioData {
-  portfolio: Portfolio[];
-  overallSummary: OverallSummary;
-  deposit_info: DepositInfo;
-  allocation_analysis: AllocationAnalysis;
-  planned_investment_expected_deposit_date: PlannedInvestment;
-}
-
-export async function fetchPortfolioData(settings: UserSettings, userId: string): Promise<PortfolioData> {
+// Use PerformanceMetrics as the return type
+export async function fetchPortfolioData(settings: UserSettings, userId: string): Promise<PerformanceMetrics> {
   try {
-    const response = await fetch(`http://127.0.0.1:8000/v1/portfolio?country=${settings.country}&currency=${settings.currency}&budget=${settings.monthlyBudget}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const portfolioData = await fetchPortfolioDataFromFetcher(settings.monthlyBudget, settings.country); // Call the new fetchPortfolioData
+    console.log("Fetched: \n", JSON.stringify(portfolioData))
+    if (!portfolioData) { // Handle case where fetcher returns null (error case)
+      throw new Error("Failed to fetch portfolio data from portfolio_fetcher.ts");
     }
-    const data = await response.json();
-    const portfolioData = data as PortfolioData;
 
-    savePortfolioData(userId, portfolioData); // **Save portfolio data to database (now synchronous)**
+    savePortfolioData(userId, portfolioData as PerformanceMetrics); // Save data, might need to adjust type if savePortfolioData expects PortfolioData interface
 
-    return portfolioData;
+    return portfolioData as PerformanceMetrics; // Return the data from portfolio_fetcher
   } catch (error) {
     console.error("Error fetching portfolio data:", error);
     throw error;
   }
 }
 
-// Function to save portfolio data for a user (now synchronous)
-export function savePortfolioData(userId: string, portfolioData: PortfolioData): void {
+// Function to save portfolio data for a user (now synchronous) - likely no change needed here if you handle PerformanceMetrics
+export function savePortfolioData(userId: string, portfolioData: PerformanceMetrics): void {
   const db = getDb();
   const now = new Date().toISOString();
   const portfolioId = uuidv4(); // Generate a unique ID for the portfolio record
@@ -104,7 +35,7 @@ export function savePortfolioData(userId: string, portfolioData: PortfolioData):
     insertStmt.run(
       portfolioId,
       userId,
-      JSON.stringify(portfolioData), // Serialize PortfolioData to JSON string
+      JSON.stringify(portfolioData), // Serialize PerformanceMetrics to JSON string
       now,
       now,
       now
@@ -116,8 +47,8 @@ export function savePortfolioData(userId: string, portfolioData: PortfolioData):
 }
 
 
-// Function to get portfolio data for a user (now synchronous)
-export function getPortfolioData(userId: string): PortfolioData | null {
+// Function to get portfolio data for a user (now synchronous) - likely no change needed here, but type might need adjustment if you keep PortfolioData interface
+export function getPortfolioData(userId: string): PerformanceMetrics | null { // Adjust return type to PerformanceMetrics or PortfolioData if you keep it
   const db = getDb();
 
   try {
@@ -127,7 +58,7 @@ export function getPortfolioData(userId: string): PortfolioData | null {
     const result = stmt.get(userId) as { portfolioData: string } | undefined; // Type assertion for get
 
     if (result && result.portfolioData) {
-      return JSON.parse(result.portfolioData) as PortfolioData; // Deserialize JSON string to PortfolioData
+      return JSON.parse(result.portfolioData) as PerformanceMetrics; // Deserialize JSON string to PerformanceMetrics
     } else {
       console.error("No portfolio data found for this user.");
       return null; // No portfolio data found for this user

@@ -59,25 +59,25 @@ export default function Dashboard() {
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Invested</h3>
               <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {user.settings.currency} {portfolioData?.overallSummary?.totalInvestedOverall?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
+                {user.settings.currency} {portfolioData?.overallSummary?.overallSummary?.totalInvestedOverall?.toFixed(2) ?? 'N/A'} {/* Correct path with overallSummary.overallSummary */}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className={`${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-red-50 dark:bg-red-900'} dark:bg-opacity-20`}>
+        <Card className={`${portfolioData?.overallSummary?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-red-50 dark:bg-red-900'} dark:bg-opacity-20`}>
           <div className="flex items-center">
-            <div className={`p-3 rounded-full ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'}`}>
-              <FiPieChart className={`h-6 w-6 ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
+            <div className={`p-3 rounded-full ${portfolioData?.overallSummary?.overallSummary?.totalResultOverall >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'}`}>
+              <FiPieChart className={`h-6 w-6 ${portfolioData?.overallSummary?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
             </div>
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Return</h3>
-              <p className={`text-lg font-semibold ${portfolioData?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {portfolioData?.overallSummary?.totalResultOverall >= 0 ? '+' : ''}
-                {user.settings.currency} {portfolioData?.overallSummary?.totalResultOverall?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
+              <p className={`text-lg font-semibold ${portfolioData?.overallSummary?.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {portfolioData?.overallSummary?.overallSummary?.totalResultOverall >= 0 ? '+' : ''}
+                {user.settings.currency} {portfolioData?.overallSummary?.overallSummary?.totalResultOverall?.toFixed(2) ?? 'N/A'} {/* Correct path with overallSummary.overallSummary */}
                 {' '}
-                ({portfolioData?.overallSummary?.returnPercentageOverall >= 0 ? '+' : ''}
-                {portfolioData?.overallSummary?.returnPercentageOverall?.toFixed(2) ?? 'N/A'}%) {/* Handle null portfolioData */}
+                ({portfolioData?.overallSummary?.overallSummary?.returnPercentageOverall >= 0 ? '+' : ''} {/* Correct path with overallSummary.overallSummary */}
+                {portfolioData?.overallSummary?.overallSummary?.returnPercentageOverall?.toFixed(2) ?? 'N/A'}%) {/* Correct path with overallSummary.overallSummary */}
               </p>
             </div>
           </div>
@@ -158,13 +158,13 @@ export default function Dashboard() {
               <div>
                 <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Cash Available</h4>
                 <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {user.settings.currency} {portfolioData?.deposit_info?.freeCashAvailable?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData */}
+                  {user.settings.currency} {portfolioData?.freeCashAvailable?.toFixed(2) ?? 'N/A'} {/* Handle null portfolioData - Correct path already here */}
                 </p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Next Deposit</h4>
                 <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {portfolioData?.deposit_info?.expectedDepositDate ? formatDate(portfolioData.deposit_info.expectedDepositDate) : 'N/A'} {/* Handle null portfolioData */}
+                  {portfolioData?.plannedInvestmentExpectedDepositDate?.Next_Gen_Growth ? formatDate(portfolioData.plannedInvestmentExpectedDepositDate.Next_Gen_Growth) : 'N/A'} {/* Handle null portfolioData - updated path to plannedInvestmentExpectedDepositDate.Next_Gen_Growth */}
                 </p>
               </div>
             </div>
@@ -172,8 +172,8 @@ export default function Dashboard() {
             <div>
               <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Allocation Differences</h4>
               <div className="space-y-2">
-                {portfolioData?.allocation_analysis?.allocationDifferences && // Conditionally render allocation differences
-                  Object.entries(portfolioData.allocation_analysis.allocationDifferences).map(([portfolio, difference]) => (
+                {portfolioData?.allocationAnalysis?.allocationDifferences && // Conditionally render allocation differences - Correct path already here
+                  Object.entries(portfolioData.allocationAnalysis.allocationDifferences).map(([portfolio, difference]) => (
                     <div key={portfolio} className="flex justify-between items-center">
                       <span className="text-sm text-gray-700 dark:text-gray-300">{portfolio}</span>
                       <span className={`text-sm font-medium ${
@@ -183,7 +183,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   ))}
-                   {!portfolioData?.allocation_analysis?.allocationDifferences && ( // Message if no allocation differences
+                   {!portfolioData?.allocationAnalysis?.allocationDifferences && ( // Message if no allocation differences - Correct path already here
                       <p className="text-gray-500 dark:text-gray-400">Allocation analysis not available.</p>
                    )}
               </div>

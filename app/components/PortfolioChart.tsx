@@ -1,24 +1,26 @@
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
-import { PortfolioData } from '~/services/portfolio.server';
+import { PerformanceMetrics } from '~/utils/portfolio_fetcher'; // Correct import from portfolio_fetcher.ts
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 interface PortfolioChartProps {
-  portfolioData: PortfolioData;
+  portfolioData: PerformanceMetrics | null; // Allow null, and use PerformanceMetrics type
 }
 
 export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
+  if (!portfolioData || !portfolioData.allocationAnalysis || !portfolioData.allocationAnalysis.currentAllocation) {
+    return <div>Loading Portfolio Chart...</div>; // Or handle the loading/error state appropriately
+  }
+
   // Extract data for the pie chart
-  const portfolioNames = Object.keys(portfolioData.allocation_analysis.currentAllocation);
+  const portfolioNames = Object.keys(portfolioData.allocationAnalysis.currentAllocation); // Corrected to allocationAnalysis
 
   // Extract percentages from strings like "978.98 BGN [50.54%]"
-  const currentAllocationValues = Object.values(portfolioData.allocation_analysis.currentAllocation).map(value => {
+  const currentAllocationValues = Object.values(portfolioData.allocationAnalysis.currentAllocation).map(value => { // Corrected to allocationAnalysis
     const percentMatch = value.match(/\[(.*?)%\]/);
     return percentMatch ? parseFloat(percentMatch[1]) : 0;
   });
-
-  console.log("currentAllocationValues:", currentAllocationValues); // <-- ADD THIS LOG
 
   const data = {
     labels: portfolioNames,
