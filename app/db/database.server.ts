@@ -4,10 +4,7 @@ import path from 'path';
 let db: Database | null = null; // Note: Type is now from 'better-sqlite3'
 
 export function getDb(): Database { // getDb now returns Database directly (synchronous in better-sqlite3)
-    console.log("getDb() called.");
-
     if (db) {
-        console.log("getDb(): Reusing existing database connection.");
         return db;
     }
 
@@ -15,7 +12,6 @@ export function getDb(): Database { // getDb now returns Database directly (sync
 
     try {
         db = new Database(dbPath); // Synchronous database creation in better-sqlite3
-        console.log("getDb(): Connected to database using better-sqlite3.");
 
         // Initialize database schema (moved back schema creation - synchronous in better-sqlite3)
         db.exec(`
@@ -87,7 +83,6 @@ export function getDb(): Database { // getDb now returns Database directly (sync
                 FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
             );
         `);
-        console.log("getDb(): Database schema initialized using better-sqlite3.");
 
         return db;
 
