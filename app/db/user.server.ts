@@ -1,6 +1,6 @@
 import { getDb } from './database.server';
 import bcrypt from 'bcryptjs';
-import { User, UserSettings } from './schema';
+import { User, UserSettings, createUser as createUserSchema } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
 export function createUser(username: string, email: string, password: string): User {
@@ -8,18 +8,34 @@ export function createUser(username: string, email: string, password: string): U
     const passwordHash = bcrypt.hashSync(password, 10);
     const now = new Date().toISOString();
     const userId = uuidv4();
-    const settingsId = uuidv4();
 
     try {
+        // Create user with the schema from database.server.ts
         const insertUserStmt = db.prepare(
-            'INSERT INTO users (id, username, passwordHash, email, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO users (id, email, password, firstName, lastName, settings, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        insertUserStmt.run(userId, username, passwordHash, email, now, now);
-
-        const insertSettingsStmt = db.prepare(
-            'INSERT INTO user_settings (id, userId, country, currency, monthlyBudget, theme, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        
+        // Create default settings
+        const defaultSettings: UserSettings = {
+            theme: 'system',
+            currency: 'USD',
+            language: 'en',
+            notifications: true,
+            monthlyBudget: 1000,
+            country: 'US'
+        };
+        
+        // Insert the user with username as firstName for backward compatibility
+        insertUserStmt.run(
+            userId, 
+            email, 
+            passwordHash, 
+            username, // Use username as firstName for compatibility
+            '', // Empty lastName
+            JSON.stringify(defaultSettings), 
+            now, 
+            now
         );
-        insertSettingsStmt.run(settingsId, userId, 'Bulgaria', 'BGN', 1000, 'light', now, now);
 
         const user = getUserById(userId);
         if (!user) {
@@ -37,30 +53,31 @@ export function getUserById(id: string): User | null {
     const db = getDb();
     try {
         const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
-        const user = stmt.get(id) as User | undefined;
+        const user = stmt.get(id) as any;
 
         if (!user) return null;
 
-        const settingsStmt = db.prepare('SELECT * FROM user_settings WHERE userId = ?');
-        const settings = settingsStmt.get(id) as UserSettings | undefined;
+        // Parse the settings JSON string
+        const settings = user.settings ? JSON.parse(user.settings) : {
+            theme: 'system',
+            currency: 'USD',
+            language: 'en',
+            notifications: true,
+            monthlyBudget: 1000,
+            country: 'US'
+        };
 
         return {
             id: user.id,
-            username: user.username,
-            passwordHash: user.passwordHash,
             email: user.email,
+            password: user.password,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            username: user.firstName || '', // Use firstName as username for compatibility
+            passwordHash: user.password, // For backward compatibility
+            settings,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
-            settings: settings || {
-                id: '',
-                userId: user.id,
-                country: 'Bulgaria',
-                currency: 'BGN',
-                monthlyBudget: 1000,
-                theme: 'light',
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt
-            }
+            updatedAt: user.updatedAt
         } as User;
     } catch (error) {
         console.error("getUserById: Error during database interaction:", error);
@@ -73,8 +90,9 @@ export function getUserByUsername(username: string): User | null {
     console.log("getUserByUsername: Database object:", db);
 
     try {
-        const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-        const user = stmt.get(username) as User | undefined;
+        // Look for username in firstName field since we're using firstName as username
+        const stmt = db.prepare('SELECT * FROM users WHERE firstName = ?');
+        const user = stmt.get(username) as any;
         console.log("getUserByUsername: Result of user query:", user);
 
         if (!user) {
@@ -82,26 +100,27 @@ export function getUserByUsername(username: string): User | null {
             return null;
         }
 
-        const settingsStmt = db.prepare('SELECT * FROM user_settings WHERE userId = ?');
-        const settings = settingsStmt.get(user.id) as UserSettings | undefined;
+        // Parse the settings JSON string
+        const settings = user.settings ? JSON.parse(user.settings) : {
+            theme: 'system',
+            currency: 'USD',
+            language: 'en',
+            notifications: true,
+            monthlyBudget: 1000,
+            country: 'US'
+        };
 
         return {
             id: user.id,
-            username: user.username,
-            passwordHash: user.passwordHash,
             email: user.email,
+            password: user.password,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            username: user.firstName || '', // Use firstName as username for compatibility
+            passwordHash: user.password, // For backward compatibility
+            settings,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
-            settings: settings || {
-                id: '',
-                userId: user.id,
-                country: 'Bulgaria',
-                currency: 'BGN',
-                monthlyBudget: 1000,
-                theme: 'light',
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt
-            }
+            updatedAt: user.updatedAt
         } as User;
 
     } catch (error) {
@@ -119,16 +138,16 @@ export function verifyLogin(username: string, password: string): User | null {
     }
 
     const db = getDb(); // Get db connection - although not directly used in this sync version for query test.
-    const testStmt = db.prepare('SELECT username FROM users'); // Prepare statement for test query
+    const testStmt = db.prepare('SELECT firstName FROM users'); // Prepare statement for test query
     const test = testStmt.get(); // Execute test query synchronously
     console.log(user, test);
 
-    if (!user.passwordHash) {
+    if (!user.password) {
         console.log(`verifyLogin: Password hash not found for username: ${username}`);
         return null;
     }
 
-    const isValid = bcrypt.compareSync(password, user.passwordHash); // Use bcrypt.compareSync for sync
+    const isValid = bcrypt.compareSync(password, user.password); // Use bcrypt.compareSync for sync
     if (!isValid) {
         console.log(`verifyLogin: Invalid password for username: ${username}`);
         return null;
@@ -140,39 +159,46 @@ export function verifyLogin(username: string, password: string): User | null {
 
 export function updateUserSettings(
     userId: string,
-    settings: Partial<UserSettings>
+    settingsUpdate: Partial<UserSettings>
 ): UserSettings {
     const db = getDb();
     const now = new Date().toISOString();
 
     try {
-        const currentSettingsStmt = db.prepare('SELECT * FROM user_settings WHERE userId = ?');
-        const currentSettings = currentSettingsStmt.get(userId) as UserSettings;
+        // Get current user
+        const userStmt = db.prepare('SELECT * FROM users WHERE id = ?');
+        const user = userStmt.get(userId) as any;
 
-        if (!currentSettings) {
-            throw new Error('Settings not found for user');
+        if (!user) {
+            throw new Error('User not found');
         }
 
-        const updatedSettings = {
-            ...currentSettings,
-            ...settings,
-            updatedAt: now
+        // Parse current settings
+        const currentSettings = user.settings ? JSON.parse(user.settings) : {
+            theme: 'system',
+            currency: 'USD',
+            language: 'en',
+            notifications: true,
+            monthlyBudget: 1000,
+            country: 'US'
         };
 
-        const { id, userId: _, ...settingsToUpdate } = updatedSettings;
+        // Update settings
+        const updatedSettings = {
+            ...currentSettings,
+            ...settingsUpdate
+        };
 
-        const keys = Object.keys(settingsToUpdate);
-        const setClause = keys.map(key => `${key} = ?`).join(', ');
-
+        // Update user record with new settings
         const updateStmt = db.prepare(
-            `UPDATE user_settings SET ${setClause} WHERE id = ?`
+            'UPDATE users SET settings = ?, updatedAt = ? WHERE id = ?'
         );
-        updateStmt.run(...Object.values(settingsToUpdate), id);
+        updateStmt.run(JSON.stringify(updatedSettings), now, userId);
 
         return updatedSettings as UserSettings;
 
     } catch (error) {
         console.error("updateUserSettings: Error during database interaction:", error);
-        throw error; // Re-throw error to be caught by action/loader
+        throw error;
     }
 }
