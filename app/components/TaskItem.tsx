@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { FiEdit2, FiTrash2, FiDollarSign, FiCalendar } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiDollarSign, FiCalendar, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { Task } from "~/db/schema";
-import { formatDate } from "~/utils/date";
+import { formatDate, formatCurrency } from "~/utils/formatters";
 import Button from "./Button";
 
 interface TaskItemProps {
@@ -9,9 +9,16 @@ interface TaskItemProps {
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onToggleComplete: (taskId: string, completed: boolean) => void;
+  onClick?: () => void;
 }
 
-export default function TaskItem({ task, onEdit, onDelete, onToggleComplete }: TaskItemProps) {
+export default function TaskItem({ 
+  task, 
+  onEdit, 
+  onDelete, 
+  onToggleComplete,
+  onClick
+}: TaskItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   const priorityColors = {
@@ -20,24 +27,65 @@ export default function TaskItem({ task, onEdit, onDelete, onToggleComplete }: T
     high: "bg-red-100 text-red-800 dark:bg-red-900 dark:bg-opacity-30 dark:text-red-300",
   };
   
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+  };
+  
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(task);
+  };
+  
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(task.id);
+  };
+  
+  const handleToggleComplete = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onToggleComplete(task.id, e.target.checked);
+  };
+  
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg mb-4 overflow-hidden">
+    <div 
+      className={`border border-gray-200 dark:border-gray-700 rounded-lg mb-4 overflow-hidden transition-all duration-200 ${
+        onClick ? 'cursor-pointer hover:shadow-md' : ''
+      }`}
+      onClick={onClick}
+    >
       <div className="p-4 bg-white dark:bg-gray-800">
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3">
-            <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={() => onToggleComplete(task.id, !task.completed)}
-              className="h-5 w-5 mt-1 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <div>
-              <h3 
-                className={`text-lg font-medium ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}
-                onClick={() => setIsExpanded(!isExpanded)}
-              >
-                {task.title}
-              </h3>
+          <div className="flex items-start space-x-3 flex-1">
+            <div className="mt-1">
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={handleToggleComplete}
+                className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                aria-label={`Mark task "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
+              />
+            </div>
+            
+            <div className="flex-1">
+              <div className="flex items-center">
+                <h3 
+                  className={`text-lg font-medium flex-1 ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}
+                  onClick={handleToggleExpand}
+                >
+                  {task.title}
+                </h3>
+                
+                {task.description && (
+                  <button 
+                    onClick={handleToggleExpand}
+                    className="ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none"
+                    aria-label={isExpanded ? "Collapse task details" : "Expand task details"}
+                  >
+                    {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+                  </button>
+                )}
+              </div>
               
               <div className="flex flex-wrap gap-2 mt-2">
                 {task.priority && (
@@ -62,27 +110,29 @@ export default function TaskItem({ task, onEdit, onDelete, onToggleComplete }: T
                 {task.amount && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                     <FiDollarSign className="mr-1" />
-                    {task.amount}
+                    {formatCurrency(task.amount)}
                   </span>
                 )}
               </div>
             </div>
           </div>
           
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 ml-4">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onEdit(task)}
+              onClick={handleEdit}
               aria-label="Edit task"
+              className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             >
               <FiEdit2 className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onDelete(task.id)}
+              onClick={handleDelete}
               aria-label="Delete task"
+              className="text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
             >
               <FiTrash2 className="h-4 w-4" />
             </Button>
@@ -90,8 +140,8 @@ export default function TaskItem({ task, onEdit, onDelete, onToggleComplete }: T
         </div>
         
         {isExpanded && task.description && (
-          <div className="mt-4 pl-8">
-            <p className="text-gray-600 dark:text-gray-400 whitespace-pre-line">{task.description}</p>
+          <div className="mt-4 pl-8 pr-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-md">
+            <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">{task.description}</p>
           </div>
         )}
       </div>

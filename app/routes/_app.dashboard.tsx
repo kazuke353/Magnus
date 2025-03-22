@@ -3,7 +3,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node"; // Use 'type' import
 import { json } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
 import { getUserTasks, Task } from "~/db/tasks.server";
-import { getPortfolioData, PortfolioData } from "~/services/portfolio.server"; // Import PortfolioData type
+import { fetchPortfolioData, PortfolioData } from "~/services/portfolio.server"; // Import PortfolioData type
 import Card from "~/components/Card";
 import { FiCalendar, FiDollarSign, FiPieChart, FiMessageSquare } from "react-icons/fi";
 import { formatDate } from "~/utils/date";
@@ -23,7 +23,7 @@ export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly
     .slice(0, 5);
 
   // Get portfolio data
-  const portfolioData = await getPortfolioData(user.id);
+  const portfolioData = await fetchPortfolioData(user.id);
 
   return json({
     user,

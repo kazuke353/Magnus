@@ -1,33 +1,61 @@
 import { cssBundleHref } from "@remix-run/css-bundle";
-import type { LinksFunction } from "@remix-run/node";
-import { Links, LiveReload, Meta, Outlet, Scripts, ScrollRestoration } from "@remix-run/react";
-
-const tailwindStylesheetUrl = "./app/tailwind.css";
+import { json, LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import {
+  Links,
+  LiveReload,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLoaderData,
+} from "@remix-run/react";
+import { getUser } from "~/services/auth.server";
+import tailwindStylesheetUrl from "~/tailwind.css";
+import calendarStylesheetUrl from "~/styles/calendar.css";
+import { useEffect, useState } from "react";
+import { getTheme, Theme } from "~/utils/theme";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwindStylesheetUrl },
+  { rel: "stylesheet", href: calendarStylesheetUrl },
   ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
-  { rel: "icon", href: "/favicon.ico" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
 ];
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await getUser(request);
+  const theme = getTheme(request);
+  return json({ user, theme });
+}
+
 export default function App() {
+  const { user, theme: initialTheme } = useLoaderData<typeof loader>();
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
+  
+  useEffect(() => {
+    setTheme(initialTheme);
+  }, [initialTheme]);
+
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className={theme === "dark" ? "dark" : ""}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body className="h-full">
+      <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
         <Outlet />
         <ScrollRestoration />
         <Scripts />
+        <LiveReload />
       </body>
     </html>
   );

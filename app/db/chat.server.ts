@@ -61,6 +61,7 @@ export function addChatMessage(
   const now = new Date().toISOString();
   const id = uuidv4();
 
+  console.log("role: ", role, "Content: ", content)
   try {
     const insertStmt = db.prepare(
       'INSERT INTO chat_messages (id, userId, sessionId, content, role, createdAt) VALUES (?, ?, ?, ?, ?, ?)'

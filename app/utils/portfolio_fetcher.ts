@@ -13,6 +13,10 @@ const piesListURL = "https://live.trading212.com/api/v0/equity/pies";
 const instrumentsMetadataURL = "https://live.trading212.com/api/v0/equity/metadata/instruments";
 const cashURL = "https://live.trading212.com/api/v0/equity/account/cash";
 
+// In-memory cache for API responses
+const apiCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_EXPIRATION_TIME = 5 * 60 * 1000; // 5 minutes
+
 export interface InstrumentMetadata {
     ticker: string;
     name: string;
@@ -49,7 +53,7 @@ export interface PieData extends Record<string, any> { // Allow extra properties
     name: string;
     creationDate: string;
     dividendCashAction: string;
-    instruments: PieInstrument[];
+    instruments: PieInstrument;
     totalInvested: number;
     totalResult: number;
     returnPercentage: number;
@@ -64,7 +68,7 @@ export interface PerformanceMetrics extends Record<string, any> { // Allow extra
     fetchDate?: string;
     allocationAnalysis?: AllocationAnalysis; // Type for allocationAnalysis
     rebalanceInvestmentForTarget?: TargetInvestments | null; // Type for planned_investment_expected_deposit_date
-    portfolio?: PieData[] | null; // Add portfolio to PerformanceMetrics
+    portfolio?: PieData| null; // Add portfolio to PerformanceMetrics
     overallSummary?: OverallSummary | null; // Add overallSummary to PerformanceMetrics
 }
 
@@ -73,6 +77,7 @@ export interface OverallSummary {
         totalInvestedOverall: number;
         totalResultOverall: number;
         returnPercentageOverall: number;
+        fetchDate?: string;
     }
 }
 
@@ -109,6 +114,13 @@ export interface TargetInvestments {
 
 
 async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = 'GET', headers: Record<string, string>, delay: number = 5, retries: number = 3): Promise<any | null> {
+    const cacheKey = url;
+    const cachedResponse = apiCache.get(cacheKey);
+
+    if (cachedResponse && Date.now() - cachedResponse.timestamp < CACHE_EXPIRATION_TIME) {
+        return cachedResponse.data;
+    }
+
     let attempts = 0;
     while (attempts <= retries) {
         try {
@@ -118,12 +130,14 @@ async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = '
                 headers: headers
             });
             if (response.status >= 200 && response.status < 300) {
+                apiCache.set(cacheKey, { data: response, timestamp: Date.now() });
+                console.log(`Request for ${url} successful.`)
                 return response;
             } else {
-                console.log(`Request failed with status ${response.status}, retrying in ${delay} seconds...`);
+                console.log(`Request for ${url} failed with status ${response.status}, retrying in ${delay} seconds...`);
             }
         } catch (error: any) {
-            console.error(`Request error: ${error.message}, retrying in ${delay} seconds...`);
+            console.error(`Request error for ${url}: ${error.message}, retrying in ${delay} seconds...`);
             if (error.response) {
                 console.error(`Response details: status ${error.response.status}, data: ${JSON.stringify(error.response.data)}`);
             }
@@ -132,7 +146,7 @@ async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = '
         await new Promise(resolve => setTimeout(resolve, delay * 1000));
         delay *= 2;
     }
-    console.error(`Failed after ${retries} retries.`);
+    console.error(`Failed after ${retries} retries for ${url}.`);
     return null;
 }
 
@@ -143,7 +157,7 @@ async function getAllInstrumentsMetadata(): Promise<Record<string, InstrumentMet
         return null;
     }
     try {
-        const instruments = response.data as InstrumentMetadata[];
+        const instruments = response.data as InstrumentMetadata;
         const metadataByTicker: Record<string, InstrumentMetadata> = {};
         instruments.forEach(instrument => {
             metadataByTicker[instrument.ticker] = instrument;
@@ -175,6 +189,17 @@ async function formatYahooTicker(ticker: string): Promise<string> {
     if (formatted.endsWith('1.L')) {
         formatted = formatted.slice(0, -3);
         formatted += '.L';
+    }
+
+    //Add more specific ticker formating here.
+    if(ticker === 'BRK_B_US_EQ'){
+        formatted = 'BRK-B';
+    }
+    if(ticker === 'ALVd_EQ'){
+        formatted = 'ALV.DE';
+    }
+    if(ticker === 'ABNa_EQ'){
+        formatted = 'ABN.AS';
     }
 
     return formatted;
@@ -277,6 +302,7 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
         pieData.totalInvested = pieData.instruments.reduce((sum, instr) => sum + instr.investedValue, 0);
         pieData.totalResult = pieData.instruments.reduce((sum, instr) => sum + instr.resultValue, 0);
         pieData.returnPercentage = pieData.totalInvested !== 0 ? (pieData.totalResult / pieData.totalInvested) * 100 : 0;
+        pieData.fetchDate = format(new Date(), "yyyy-MM-dd HH:mm:ss");
 
         return pieData;
 
@@ -291,7 +317,7 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
     }
 }
 
-async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentMetadata>, delayBetweenPies: number = 1): Promise<[PieData[], OverallSummary] | [null, null]> {
+async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentMetadata>, delayBetweenPies: number = 1): Promise<[PieData, OverallSummary] | [null, null]> {
     const response = await exponentialBackoffRequest(piesListURL, 'GET', headers, 5);
     if (response === null) {
         console.log("Failed to fetch list of pies.");
@@ -299,8 +325,8 @@ async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentM
     }
 
     try {
-        const piesList = response.data as any[];
-        const allPies: PieData[] = [];
+        const piesList = response.data as any;
+        const allPies: PieData= [];
         let totalInvestedOverall = 0;
         let totalResultOverall = 0;
 
@@ -316,12 +342,14 @@ async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentM
         }
 
         const returnPercentageOverall = totalInvestedOverall !== 0 ? (totalResultOverall / totalInvestedOverall) * 100 : 0;
+        const fetchDate = format(new Date(), "yyyy-MM-dd HH:mm:ss");
 
         const overallSummary: OverallSummary = {
             overallSummary: {
                 totalInvestedOverall: totalInvestedOverall,
                 totalResultOverall: totalResultOverall,
-                returnPercentageOverall: returnPercentageOverall
+                returnPercentageOverall: returnPercentageOverall,
+                fetchDate: fetchDate
             }
         };
 
@@ -354,7 +382,7 @@ function extract_overall_summary(portfolio_data: any): OverallSummary {
     return overall_summary;
 }
 
-function extract_pies(portfolio: PieData[]): PieData[] {
+function extract_pies(portfolio: PieData): PieData{
     /**Extracts pies (excluding overallSummary).*/
     return portfolio.filter(pie => pie.name !== "OverallSummary"); // Assuming "overallSummary" was meant to be pie.name === "OverallSummary" based on context. If it's really about excluding a key named "overallSummary" in pie object, the condition should be adjusted.
 }
@@ -419,7 +447,7 @@ function extract_target_allocation_from_name(pie_name: string): [string | null, 
     }
 }
 
-function calculate_current_allocation(pies: PieData[]): [CurrentAllocation, TargetAllocationPercentages] {
+function calculate_current_allocation(pies: PieData): [CurrentAllocation, TargetAllocationPercentages] {
     /**Calculates current and target allocation.*/
     const current_allocation: CurrentAllocation = {};
     const target_allocation_percentages: TargetAllocationPercentages = {};
@@ -548,7 +576,7 @@ function calculate_current_target_investments(portfolio_data: PerformanceMetrics
 }
 
 export async function fetchPortfolioData(budget: number = 1000, cc: string = "BG"): Promise<PerformanceMetrics> {
-    let all_pies_data: PieData[] | null = null;
+    let all_pies_data: PieData| null = null;
     let overall_summary: OverallSummary | null = null;
     let performanceMetrics: AllocationAnalysis | null = null; // Define performanceMetrics here
     let targetInvestments: TargetInvestments | null = null; // Define targetInvestments here
@@ -574,7 +602,7 @@ export async function fetchPortfolioData(budget: number = 1000, cc: string = "BG
         }
     }
 
-    const cashData = cashResponse.data as any[]; // Cast to any[] as the response is an array
+    const cashData = cashResponse.data as any; // Cast to anyas the response is an array
     let totalFreeCash = 0;
     if (Array.isArray(cashData)) {
         for (const cashEntry of cashData) {
@@ -589,7 +617,8 @@ export async function fetchPortfolioData(budget: number = 1000, cc: string = "BG
         overallSummary: overall_summary,
         allocationAnalysis:  {} as AllocationAnalysis, // Initialize as empty object to avoid potential undefined errors
         rebalanceInvestmentForTarget: null,
-        freeCashAvailable: totalFreeCash
+        freeCashAvailable: totalFreeCash,
+        fetchDate: format(new Date(), "yyyy-MM-dd HH:mm:ss")
     } as PerformanceMetrics; // Type assertion to ensure the structure
 
 

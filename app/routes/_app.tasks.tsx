@@ -8,23 +8,30 @@ import Card from "~/components/Card";
 import Button from "~/components/Button";
 import TaskItem from "~/components/TaskItem";
 import TaskForm from "~/components/TaskForm";
+import TaskCalendar from "~/components/TaskCalendar";
+import LoadingIndicator from "~/components/LoadingIndicator";
+import Notification from "~/components/Notification";
 import { FiPlus, FiFilter, FiCalendar, FiList } from "react-icons/fi";
+import { errorResponse } from "~/utils/error-handler";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await requireAuthentication(request, "/login");
-  
-  const tasks = await getUserTasks(user.id);
-  
-  return json({ user, tasks });
+  try {
+    const user = await requireAuthentication(request, "/login");
+    const tasks = await getUserTasks(user.id);
+    
+    return json({ user, tasks });
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireAuthentication(request, "/login");
-  
-  const formData = await request.formData();
-  const action = formData.get("_action") as string;
-  
   try {
+    const user = await requireAuthentication(request, "/login");
+    
+    const formData = await request.formData();
+    const action = formData.get("_action") as string;
+    
     if (action === "create") {
       const title = formData.get("title") as string;
       const description = formData.get("description") as string;
@@ -43,7 +50,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
       
       const task = await createTask(user.id, taskData);
-      return json({ success: true, task });
+      return json({ success: true, task, message: "Task created successfully" });
     }
     
     if (action === "update") {
@@ -65,13 +72,13 @@ export async function action({ request }: ActionFunctionArgs) {
       };
       
       const task = await updateTask(taskId, taskData);
-      return json({ success: true, task });
+      return json({ success: true, task, message: "Task updated successfully" });
     }
     
     if (action === "delete") {
       const taskId = formData.get("taskId") as string;
       await deleteTask(taskId);
-      return json({ success: true });
+      return json({ success: true, message: "Task deleted successfully" });
     }
     
     if (action === "toggle") {
@@ -79,25 +86,53 @@ export async function action({ request }: ActionFunctionArgs) {
       const completed = formData.get("completed") === "true";
       
       const task = await updateTask(taskId, { completed });
-      return json({ success: true, task });
+      return json({ 
+        success: true, 
+        task, 
+        message: `Task marked as ${completed ? 'completed' : 'pending'}` 
+      });
     }
     
     return json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
-    return json({ error: (error as Error).message }, { status: 500 });
+    return errorResponse(error);
   }
 }
 
 export default function Tasks() {
-  const { user, tasks } = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submit = useSubmit();
+  
+  // Handle potential error in loader data
+  const { user, tasks, error } = loaderData.error 
+    ? { user: null, tasks: [], error: loaderData.error } 
+    : { ...loaderData, error: null };
   
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [notification, setNotification] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    message: string;
+  } | null>(null);
+  
+  // Set notification when action completes
+  if (actionData && !notification) {
+    if (actionData.success) {
+      setNotification({
+        type: "success",
+        message: actionData.message || "Operation completed successfully"
+      });
+    } else if (actionData.error) {
+      setNotification({
+        type: "error",
+        message: actionData.error.message || "An error occurred"
+      });
+    }
+  }
   
   const handleCreateTask = (taskData: Partial<Task>) => {
     const formData = new FormData();
@@ -155,8 +190,40 @@ export default function Tasks() {
     return true;
   });
   
+  // Show loading indicator during navigation
+  const isLoading = navigation.state === "loading" || navigation.state === "submitting";
+  
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Notification
+          type="error"
+          message={error.message || "An error occurred while loading tasks"}
+          onClose={() => {}}
+        />
+        <Card>
+          <div className="text-center py-6">
+            <p className="text-gray-500 dark:text-gray-400">
+              Unable to load tasks. Please try again later.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
+      {isLoading && <LoadingIndicator fullScreen message="Processing..." />}
+      
+      {notification && (
+        <Notification
+          type={notification.type}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tasks & Schedule</h1>
@@ -273,11 +340,15 @@ export default function Tasks() {
       
       {/* Calendar view */}
       {viewMode === "calendar" && (
-        <Card>
-          <div className="text-center py-6">
-            <p className="text-gray-500 dark:text-gray-400">Calendar view is coming soon!</p>
-          </div>
-        </Card>
+        <TaskCalendar
+          tasks={tasks}
+          onEditTask={(task) => {
+            setEditingTask(task);
+            setShowForm(true);
+          }}
+          onDeleteTask={handleDeleteTask}
+          onToggleComplete={handleToggleComplete}
+        />
       )}
     </div>
   );
