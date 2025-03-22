@@ -7,8 +7,6 @@ export interface User {
   password: string; // Hashed password
   firstName: string;
   lastName: string;
-  username?: string; // For backward compatibility
-  passwordHash?: string; // For backward compatibility
   settings: UserSettings;
   createdAt: string;
   updatedAt: string;
@@ -98,8 +96,6 @@ export function createUser(data: Partial<User>): User {
     password: data.password || '',
     firstName: data.firstName || '',
     lastName: data.lastName || '',
-    username: data.username || data.firstName || '', // For backward compatibility
-    passwordHash: data.passwordHash || data.password || '', // For backward compatibility
     settings: data.settings || {
       theme: 'system',
       currency: 'USD',

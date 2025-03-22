@@ -1,41 +1,29 @@
 import { getDb } from './database.server';
 import bcrypt from 'bcryptjs';
-import { User, UserSettings, createUser as createUserSchema } from './schema';
+import { User } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
-export function createUser(username: string, email: string, password: string): User {
+export function createUser(email: string, password: string, firstName: string = '', lastName: string = ''): User {
     const db = getDb();
     const passwordHash = bcrypt.hashSync(password, 10);
     const now = new Date().toISOString();
     const userId = uuidv4();
 
     try {
-        // Create user with the schema from database.server.ts
-        const insertUserStmt = db.prepare(
-            'INSERT INTO users (id, email, password, firstName, lastName, settings, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        
-        // Create default settings
-        const defaultSettings: UserSettings = {
-            theme: 'system',
+        // Default user settings
+        const defaultSettings = {
+            theme: 'light',
             currency: 'USD',
             language: 'en',
             notifications: true,
             monthlyBudget: 1000,
             country: 'US'
         };
-        
-        // Insert the user with username as firstName for backward compatibility
-        insertUserStmt.run(
-            userId, 
-            email, 
-            passwordHash, 
-            username, // Use username as firstName for compatibility
-            '', // Empty lastName
-            JSON.stringify(defaultSettings), 
-            now, 
-            now
+
+        const insertUserStmt = db.prepare(
+            'INSERT INTO users (id, email, password, firstName, lastName, settings, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
+        insertUserStmt.run(userId, email, passwordHash, firstName, lastName, JSON.stringify(defaultSettings), now, now);
 
         const user = getUserById(userId);
         if (!user) {
@@ -53,19 +41,9 @@ export function getUserById(id: string): User | null {
     const db = getDb();
     try {
         const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
-        const user = stmt.get(id) as any;
+        const user = stmt.get(id) as any | undefined;
 
         if (!user) return null;
-
-        // Parse the settings JSON string
-        const settings = user.settings ? JSON.parse(user.settings) : {
-            theme: 'system',
-            currency: 'USD',
-            language: 'en',
-            notifications: true,
-            monthlyBudget: 1000,
-            country: 'US'
-        };
 
         return {
             id: user.id,
@@ -73,9 +51,7 @@ export function getUserById(id: string): User | null {
             password: user.password,
             firstName: user.firstName || '',
             lastName: user.lastName || '',
-            username: user.firstName || '', // Use firstName as username for compatibility
-            passwordHash: user.password, // For backward compatibility
-            settings,
+            settings: typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
         } as User;
@@ -85,30 +61,15 @@ export function getUserById(id: string): User | null {
     }
 }
 
-export function getUserByUsername(username: string): User | null {
+export function getUserByEmail(email: string): User | null {
     const db = getDb();
-    console.log("getUserByUsername: Database object:", db);
-
     try {
-        // Look for username in firstName field since we're using firstName as username
-        const stmt = db.prepare('SELECT * FROM users WHERE firstName = ?');
-        const user = stmt.get(username) as any;
-        console.log("getUserByUsername: Result of user query:", user);
+        const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
+        const user = stmt.get(email) as any | undefined;
 
         if (!user) {
-            console.log(`getUserByUsername: User not found for username: ${username}`);
             return null;
         }
-
-        // Parse the settings JSON string
-        const settings = user.settings ? JSON.parse(user.settings) : {
-            theme: 'system',
-            currency: 'USD',
-            language: 'en',
-            notifications: true,
-            monthlyBudget: 1000,
-            country: 'US'
-        };
 
         return {
             id: user.id,
@@ -116,89 +77,69 @@ export function getUserByUsername(username: string): User | null {
             password: user.password,
             firstName: user.firstName || '',
             lastName: user.lastName || '',
-            username: user.firstName || '', // Use firstName as username for compatibility
-            passwordHash: user.password, // For backward compatibility
-            settings,
+            settings: typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
         } as User;
-
     } catch (error) {
-        console.error("getUserByUsername: Error during database interaction:", error);
+        console.error("getUserByEmail: Error during database interaction:", error);
         return null;
     }
 }
 
-export function verifyLogin(username: string, password: string): User | null {
-    console.log(`verifyLogin: Attempting login for username: ${username}`);
-    const user = getUserByUsername(username);
+export function verifyLogin(email: string, password: string): User | null {
+    console.log(`verifyLogin: Attempting login for email: ${email}`);
+    const user = getUserByEmail(email);
     if (!user) {
-        console.log(`verifyLogin: User not found for username: ${username}`);
+        console.log(`verifyLogin: User not found for email: ${email}`);
         return null;
     }
-
-    const db = getDb(); // Get db connection - although not directly used in this sync version for query test.
-    const testStmt = db.prepare('SELECT firstName FROM users'); // Prepare statement for test query
-    const test = testStmt.get(); // Execute test query synchronously
-    console.log(user, test);
 
     if (!user.password) {
-        console.log(`verifyLogin: Password hash not found for username: ${username}`);
+        console.log(`verifyLogin: Password not found for email: ${email}`);
         return null;
     }
 
-    const isValid = bcrypt.compareSync(password, user.password); // Use bcrypt.compareSync for sync
+    const isValid = bcrypt.compareSync(password, user.password);
     if (!isValid) {
-        console.log(`verifyLogin: Invalid password for username: ${username}`);
+        console.log(`verifyLogin: Invalid password for email: ${email}`);
         return null;
     }
 
-    console.log(`verifyLogin: Login successful for username: ${username}`);
+    console.log(`verifyLogin: Login successful for email: ${email}`);
     return user;
 }
 
 export function updateUserSettings(
     userId: string,
-    settingsUpdate: Partial<UserSettings>
-): UserSettings {
+    settings: Partial<User['settings']>
+): User | null {
     const db = getDb();
     const now = new Date().toISOString();
 
     try {
         // Get current user
-        const userStmt = db.prepare('SELECT * FROM users WHERE id = ?');
-        const user = userStmt.get(userId) as any;
-
+        const user = getUserById(userId);
         if (!user) {
             throw new Error('User not found');
         }
 
-        // Parse current settings
-        const currentSettings = user.settings ? JSON.parse(user.settings) : {
-            theme: 'system',
-            currency: 'USD',
-            language: 'en',
-            notifications: true,
-            monthlyBudget: 1000,
-            country: 'US'
-        };
-
         // Update settings
         const updatedSettings = {
-            ...currentSettings,
-            ...settingsUpdate
+            ...user.settings,
+            ...settings
         };
 
-        // Update user record with new settings
+        // Update user in database
         const updateStmt = db.prepare(
             'UPDATE users SET settings = ?, updatedAt = ? WHERE id = ?'
         );
         updateStmt.run(JSON.stringify(updatedSettings), now, userId);
 
-        return updatedSettings as UserSettings;
-
+        // Return updated user
+        return getUserById(userId);
     } catch (error) {
         console.error("updateUserSettings: Error during database interaction:", error);
-        throw error;
+        return null;
     }
 }

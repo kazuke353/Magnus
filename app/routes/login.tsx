@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
+import { Form, Link, useActionData, useNavigation, useSearchParams } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { authenticator, isAuthenticated, commitSession } from "~/services/auth.server";
 import Input from "~/components/Input";
@@ -20,8 +20,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const session = await commitSession(request, user)
     console.log(session)
 
-    return redirect("/dashboard", {
-      headers: { "Set-Cookie":  session},
+    // Check if there's a redirectTo parameter
+    const formData = await request.formData();
+    const redirectTo = formData.get("redirectTo") as string || "/dashboard";
+
+    return redirect(redirectTo, {
+      headers: { "Set-Cookie": session },
     });
   } catch (error) {
     console.error("Login action: authenticator.authenticate error:", error);
@@ -33,8 +37,10 @@ export default function Login() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
   
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
   return (
@@ -56,16 +62,17 @@ export default function Login() {
         </div>
         
         <Form method="post" className="mt-8 space-y-6">
+          <input type="hidden" name="redirectTo" value={redirectTo} />
           <div className="rounded-md shadow-sm space-y-4">
             <Input
-              id="username"
-              name="username"
-              type="text"
+              id="email"
+              name="email"
+              type="email"
               required
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
+              label="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
             
             <Input
