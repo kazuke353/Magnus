@@ -96,11 +96,11 @@ export default function Layout({ user, children }: LayoutProps) {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                  {user.username.charAt(0).toUpperCase()}
+                  {user.firstName.charAt(0).toUpperCase()}{user.lastName.charAt(0).toUpperCase()}
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{user.username}</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{user.firstName} {user.lastName}</p>
                 <form action="/logout" method="post">
                   <button
                     type="submit"
