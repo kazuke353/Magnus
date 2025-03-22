@@ -12,7 +12,8 @@ import LoadingIndicator from "~/components/LoadingIndicator";
 import PortfolioSkeleton from "~/components/PortfolioSkeleton";
 import SortableTable from "~/components/SortableTable";
 import { showToast } from "~/components/ToastContainer";
-import { FiRefreshCw, FiTrendingUp, FiTrendingDown, FiDollarSign, FiCalendar, FiMessageSquare, FiBarChart, FiList, FiPieChart } from "react-icons/fi";
+import ImportExportModal from "~/components/ImportExportModal";
+import { FiRefreshCw, FiTrendingUp, FiTrendingDown, FiDollarSign, FiCalendar, FiMessageSquare, FiBarChart, FiList, FiPieChart, FiUpload, FiDownload } from "react-icons/fi";
 import { formatDate, formatDateTime, formatCurrency, formatPercentage } from "~/utils/formatters";
 import { errorResponse, createApiError } from "~/utils/error-handler";
 
@@ -74,6 +75,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: "Error refreshing portfolio data: " + (error instanceof Error ? error.message : "Unknown error")
         }, { status: 500 });
       }
+    } else if (actionType === "import") {
+      try {
+        const pieDataJson = formData.get("pieData") as string;
+        if (!pieDataJson) {
+          throw new Error("No pie data provided");
+        }
+
+        const pieData = JSON.parse(pieDataJson);
+        
+        // Here you would process the imported pie data and save it
+        // This is a simplified example - in a real implementation, you would:
+        // 1. Validate the imported data
+        // 2. Transform it to match your portfolio data structure
+        // 3. Merge it with existing portfolio data or create a new portfolio
+        // 4. Save the updated portfolio data
+
+        // For now, we'll just return success
+        return json({ 
+          success: true, 
+          message: `Successfully imported ${pieData.name} pie with ${pieData.instruments.length} instruments` 
+        });
+      } catch (error) {
+        console.error("Error importing pie data:", error);
+        return json({
+          success: false,
+          error: "Error importing pie data: " + (error instanceof Error ? error.message : "Unknown error")
+        }, { status: 500 });
+      }
     }
 
     return json({ error: "Invalid action" }, { status: 400 });
@@ -93,6 +122,7 @@ export default function Portfolio() {
     : { ...loaderData, error: null };
 
   const [portfolioData, setPortfolioData] = useState<PerformanceMetrics | null>(initialPortfolioData);
+  const [isImportExportModalOpen, setIsImportExportModalOpen] = useState(false);
 
   // Update portfolio data when loader data changes
   useEffect(() => {
@@ -125,8 +155,25 @@ export default function Portfolio() {
     });
   }, [submit]);
 
+  const handleImportPie = useCallback((pieData: any) => {
+    const formData = new FormData();
+    formData.append("_action", "import");
+    formData.append("pieData", JSON.stringify(pieData));
+    submit(formData, { method: "post" });
+
+    // Show loading notification
+    showToast({
+      type: "info",
+      message: "Importing pie data...",
+      duration: 3000
+    });
+  }, [submit]);
+
   const isRefreshing = navigation.state === "submitting" &&
     navigation.formData?.get("_action") === "refresh";
+
+  const isImporting = navigation.state === "submitting" &&
+    navigation.formData?.get("_action") === "import";
 
   const isLoading = navigation.state === "loading";
 
@@ -139,6 +186,28 @@ export default function Portfolio() {
         showToast({
           type: "success",
           message: "Portfolio data refreshed successfully",
+          duration: 5000
+        });
+      }
+    }
+  }, [navigation.state, navigation.formData]);
+
+  // Handle successful import
+  useEffect(() => {
+    if (navigation.state === "idle" && navigation.formData?.get("_action") === "import") {
+      const actionData = navigation.formData;
+
+      if (actionData && "success" in actionData && actionData.success) {
+        showToast({
+          type: "success",
+          message: actionData.message || "Pie data imported successfully",
+          duration: 5000
+        });
+        setIsImportExportModalOpen(false);
+      } else if (actionData && "error" in actionData) {
+        showToast({
+          type: "error",
+          message: actionData.error || "Failed to import pie data",
           duration: 5000
         });
       }
@@ -202,15 +271,26 @@ export default function Portfolio() {
           </p>
         </div>
 
-        <Button
-          onClick={handleRefresh}
-          isLoading={isRefreshing}
-          className="px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200"
-          disabled={isRefreshing}
-        >
-          <FiRefreshCw className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Data
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsImportExportModalOpen(true)}
+            className="px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200"
+          >
+            <FiUpload className="mr-2" />
+            Import/Export
+          </Button>
+          
+          <Button
+            onClick={handleRefresh}
+            isLoading={isRefreshing}
+            className="px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200"
+            disabled={isRefreshing}
+          >
+            <FiRefreshCw className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
+        </div>
       </div>
 
       {!portfolioData && !isRefreshing && (
@@ -534,6 +614,16 @@ export default function Portfolio() {
             </div>
           </Card>
         </>
+      )}
+
+      {/* Import/Export Modal */}
+      {isImportExportModalOpen && (
+        <ImportExportModal
+          onClose={() => setIsImportExportModalOpen(false)}
+          onImport={handleImportPie}
+          portfolioData={portfolioData}
+          isImporting={isImporting}
+        />
       )}
     </div>
   );

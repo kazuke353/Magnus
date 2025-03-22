@@ -1,50 +1,171 @@
+import { v4 as uuidv4 } from 'uuid';
+
+// User schema
 export interface User {
   id: string;
-  username: string;
-  passwordHash: string;
   email: string;
+  password: string; // Hashed password
+  firstName: string;
+  lastName: string;
+  settings: UserSettings;
   createdAt: string;
   updatedAt: string;
-  settings: UserSettings;
 }
 
 export interface UserSettings {
-  id: string;
-  userId: string;
-  country: string;
+  theme: 'light' | 'dark' | 'system';
   currency: string;
+  language: string;
+  notifications: boolean;
   monthlyBudget: number;
-  theme: string;
-  createdAt: string;
-  updatedAt: string;
+  country: string;
 }
 
+// Task schema
 export interface Task {
   id: string;
   userId: string;
   title: string;
-  description: string | null;
-  dueDate: string | null;
+  description?: string;
+  dueDate?: string;
   completed: boolean;
-  category: string | null;
-  priority: 'low' | 'medium' | 'high';
-  amount: number | null;
+  amount?: number;
+  category?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+// Chat schema
 export interface ChatMessage {
   id: string;
   userId: string;
-  content: string;
   role: 'user' | 'assistant';
-  createdAt: string;
+  content: string;
+  model: string;
+  timestamp: string;
 }
 
-export interface ChatSession {
+// Portfolio schema
+export interface Portfolio {
   id: string;
   userId: string;
-  title: string;
+  portfolioData: string; // JSON string
+  fetchDate: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Trading 212 Pie schema
+export interface Trading212Pie {
+  id: string;
+  userId: string;
+  name: string;
+  allocation: number;
+  instruments: Trading212Instrument[];
+  summary: {
+    totalInvested: number;
+    totalValue: number;
+    totalResult: number;
+    dividendsGained: number;
+    dividendsCash: number;
+    dividendsReinvested: number;
+  };
+  importDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Trading212Instrument {
+  slice: string;
+  name: string;
+  investedValue: number;
+  value: number;
+  result: number;
+  ownedQuantity: number;
+  dividendsGained: number | null;
+  dividendsCash: number | null;
+  dividendsReinvested: number | null;
+}
+
+// Factory functions to create new objects
+export function createUser(data: Partial<User>): User {
+  const now = new Date().toISOString();
+  return {
+    id: data.id || uuidv4(),
+    email: data.email || '',
+    password: data.password || '',
+    firstName: data.firstName || '',
+    lastName: data.lastName || '',
+    settings: data.settings || {
+      theme: 'system',
+      currency: 'USD',
+      language: 'en',
+      notifications: true,
+      monthlyBudget: 1000,
+      country: 'US'
+    },
+    createdAt: data.createdAt || now,
+    updatedAt: data.updatedAt || now
+  };
+}
+
+export function createTask(data: Partial<Task>): Task {
+  const now = new Date().toISOString();
+  return {
+    id: data.id || uuidv4(),
+    userId: data.userId || '',
+    title: data.title || '',
+    description: data.description,
+    dueDate: data.dueDate,
+    completed: data.completed !== undefined ? data.completed : false,
+    amount: data.amount,
+    category: data.category,
+    createdAt: data.createdAt || now,
+    updatedAt: data.updatedAt || now
+  };
+}
+
+export function createChatMessage(data: Partial<ChatMessage>): ChatMessage {
+  return {
+    id: data.id || uuidv4(),
+    userId: data.userId || '',
+    role: data.role || 'user',
+    content: data.content || '',
+    model: data.model || 'gpt-4',
+    timestamp: data.timestamp || new Date().toISOString()
+  };
+}
+
+export function createPortfolio(data: Partial<Portfolio>): Portfolio {
+  const now = new Date().toISOString();
+  return {
+    id: data.id || uuidv4(),
+    userId: data.userId || '',
+    portfolioData: data.portfolioData || '{}',
+    fetchDate: data.fetchDate || now,
+    createdAt: data.createdAt || now,
+    updatedAt: data.updatedAt || now
+  };
+}
+
+export function createTrading212Pie(data: Partial<Trading212Pie>): Trading212Pie {
+  const now = new Date().toISOString();
+  return {
+    id: data.id || uuidv4(),
+    userId: data.userId || '',
+    name: data.name || '',
+    allocation: data.allocation || 0,
+    instruments: data.instruments || [],
+    summary: data.summary || {
+      totalInvested: 0,
+      totalValue: 0,
+      totalResult: 0,
+      dividendsGained: 0,
+      dividendsCash: 0,
+      dividendsReinvested: 0
+    },
+    importDate: data.importDate || now,
+    createdAt: data.createdAt || now,
+    updatedAt: data.updatedAt || now
+  };
 }

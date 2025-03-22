@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { FiChevronUp, FiChevronDown, FiSearch, FiFilter } from 'react-icons/fi';
+import { useState, useMemo, useEffect } from 'react';
+import { FiChevronUp, FiChevronDown, FiSearch, FiFilter, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 interface Column<T> {
   key: keyof T | string;
