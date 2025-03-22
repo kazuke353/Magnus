@@ -19,9 +19,9 @@ export default function PortfolioChart({ portfolioData }: PortfolioChartProps) {
     // Extract data for the pie chart
     const portfolioNames = Object.keys(portfolioData.allocationAnalysis.currentAllocation);
 
-    // Extract percentages from strings like "978.98 BGN [50.54%]"
+    // Extract percentages from strings like "50.54%"
     const currentAllocationValues = Object.values(portfolioData.allocationAnalysis.currentAllocation).map(value => {
-      const percentMatch = value.match(/\[(.*?)%\]/);
+      const percentMatch = value.match(/^(.*?)%$/);
       return percentMatch ? parseFloat(percentMatch[1]) : 0;
     });
 

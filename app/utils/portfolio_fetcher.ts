@@ -578,9 +578,10 @@ function formatAllocation(
         if (isTarget) {
             formattedAllocation[key] = `${value.toFixed(2)}%`;
         } else if (!percentAllocation) {
-            formattedAllocation[key] = `${value.toFixed(2)} BGN`;
+            formattedAllocation[key] = `${value.toFixed(2)}%`;
         } else {
-            formattedAllocation[key] = `${value.toFixed(2)} BGN [${percentAllocation[key].toFixed(2)}%]`;
+            // Changed to only show percentage, not currency amount
+            formattedAllocation[key] = `${percentAllocation[key].toFixed(2)}%`;
         }
     }
     
