@@ -1,5 +1,6 @@
 import { useLoaderData, useSubmit, useNavigation, Link, json } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { requireAuthentication } from "~/services/auth.server";
 import { getPortfolioData, savePortfolioData } from "~/services/portfolio.server";
 import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
@@ -8,10 +9,11 @@ import SummaryCard from "~/components/SummaryCard";
 import Button from "~/components/Button";
 import PortfolioChart from "~/components/PortfolioChart";
 import LoadingIndicator from "~/components/LoadingIndicator";
-import Notification from "~/components/Notification";
+import PortfolioSkeleton from "~/components/PortfolioSkeleton";
+import SortableTable from "~/components/SortableTable";
+import { showToast } from "~/components/ToastContainer";
 import { FiRefreshCw, FiTrendingUp, FiTrendingDown, FiDollarSign, FiCalendar, FiMessageSquare, FiBarChart, FiList, FiPieChart } from "react-icons/fi";
 import { formatDate, formatDateTime, formatCurrency, formatPercentage } from "~/utils/formatters";
-import { useState, useEffect } from "react";
 import { errorResponse, createApiError } from "~/utils/error-handler";
 
 // Loader function to fetch user and initial portfolio data
@@ -91,10 +93,6 @@ export default function Portfolio() {
     : { ...loaderData, error: null };
 
   const [portfolioData, setPortfolioData] = useState<PerformanceMetrics | null>(initialPortfolioData);
-  const [notification, setNotification] = useState<{
-    type: "success" | "error" | "info" | "warning";
-    message: string;
-  } | null>(null);
 
   // Update portfolio data when loader data changes
   useEffect(() => {
@@ -106,27 +104,31 @@ export default function Portfolio() {
   // Show notification when there's an error
   useEffect(() => {
     if (error) {
-      setNotification({
+      showToast({
         type: "error",
-        message: error.message || "An error occurred while loading portfolio data"
+        message: error.message || "An error occurred while loading portfolio data",
+        duration: 5000
       });
     }
   }, [error]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     const formData = new FormData();
     formData.append("_action", "refresh");
     submit(formData, { method: "post" });
 
     // Show loading notification
-    setNotification({
+    showToast({
       type: "info",
-      message: "Refreshing portfolio data..."
+      message: "Refreshing portfolio data...",
+      duration: 3000
     });
-  };
+  }, [submit]);
 
   const isRefreshing = navigation.state === "submitting" &&
     navigation.formData?.get("_action") === "refresh";
+
+  const isLoading = navigation.state === "loading";
 
   // Handle successful refresh
   useEffect(() => {
@@ -134,13 +136,29 @@ export default function Portfolio() {
       const actionData = navigation.formData;
 
       if (actionData && "success" in actionData && actionData.success) {
-        setNotification({
+        showToast({
           type: "success",
-          message: "Portfolio data refreshed successfully"
+          message: "Portfolio data refreshed successfully",
+          duration: 5000
         });
       }
     }
   }, [navigation.state, navigation.formData]);
+
+  // Memoize the portfolio summary data
+  const portfolioSummary = useMemo(() => {
+    if (!portfolioData || !portfolioData.overallSummary || !portfolioData.overallSummary.overallSummary) {
+      return null;
+    }
+
+    return {
+      totalInvested: portfolioData.overallSummary.overallSummary.totalInvestedOverall || 0,
+      totalResult: portfolioData.overallSummary.overallSummary.totalResultOverall || 0,
+      returnPercentage: portfolioData.overallSummary.overallSummary.returnPercentageOverall || 0,
+      fetchDate: portfolioData.overallSummary.overallSummary.fetchDate || new Date().toISOString(),
+      estimatedAnnualDividend: portfolioData.allocationAnalysis?.estimatedAnnualDividend || 0
+    };
+  }, [portfolioData]);
 
   if (!user) {
     return (
@@ -165,17 +183,14 @@ export default function Portfolio() {
     );
   }
 
+  // Show skeleton loader during initial data fetch
+  if (isLoading && !portfolioData) {
+    return <PortfolioSkeleton />;
+  }
+
   return (
     <div className="space-y-8 px-4 md:px-8 lg:px-16 xl:px-24">
       {isRefreshing && <LoadingIndicator fullScreen message="Refreshing portfolio data..." />}
-
-      {notification && (
-        <Notification
-          type={notification.type}
-          message={notification.message}
-          onClose={() => setNotification(null)}
-        />
-      )}
 
       <div className="flex justify-between items-center mb-4">
         <div>
@@ -214,7 +229,7 @@ export default function Portfolio() {
         </Card>
       )}
 
-      {portfolioData && portfolioData.overallSummary && portfolioData.allocationAnalysis && portfolioData.portfolio && portfolioData.overallSummary.overallSummary && (
+      {portfolioData && portfolioSummary && portfolioData.allocationAnalysis && portfolioData.portfolio && (
         <>
           {/* Overall Portfolio Summary Panel - Single Card */}
           <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
@@ -228,7 +243,7 @@ export default function Portfolio() {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">INVESTED</h3>
                     <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      {formatCurrency(portfolioData.overallSummary.overallSummary?.totalInvestedOverall || 0, user.settings.currency)}
+                      {formatCurrency(portfolioSummary.totalInvested, user.settings.currency)}
                     </p>
                   </div>
                 </div>
@@ -237,8 +252,8 @@ export default function Portfolio() {
               {/* Return */}
               <div className="p-4">
                 <div className="flex items-center">
-                  <div className={`p-3 rounded-full ${portfolioData.overallSummary.overallSummary?.totalResultOverall >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'} mr-4`}>
-                    {portfolioData.overallSummary.overallSummary?.totalResultOverall >= 0 ? (
+                  <div className={`p-3 rounded-full ${portfolioSummary.totalResult >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'} mr-4`}>
+                    {portfolioSummary.totalResult >= 0 ? (
                       <FiTrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
                     ) : (
                       <FiTrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -246,8 +261,8 @@ export default function Portfolio() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">RETURN</h3>
-                    <p className={`text-xl font-bold ${portfolioData.overallSummary.overallSummary?.totalResultOverall >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} mt-1`}>
-                      {formatCurrency(portfolioData.overallSummary.overallSummary?.totalResultOverall || 0, user.settings.currency, true)}
+                    <p className={`text-xl font-bold ${portfolioSummary.totalResult >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} mt-1`}>
+                      {formatCurrency(portfolioSummary.totalResult, user.settings.currency, true)}
                     </p>
                   </div>
                 </div>
@@ -262,7 +277,7 @@ export default function Portfolio() {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">EST. ANNUAL DIVIDENDS</h3>
                     <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      {formatCurrency(portfolioData.allocationAnalysis.estimatedAnnualDividend || 0, user.settings.currency)}
+                      {formatCurrency(portfolioSummary.estimatedAnnualDividend, user.settings.currency)}
                     </p>
                   </div>
                 </div>
@@ -276,8 +291,8 @@ export default function Portfolio() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">LAST UPDATED</h3>
-                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1" title={portfolioData.overallSummary.overallSummary.fetchDate}>
-                      {formatDateTime(portfolioData.overallSummary.overallSummary.fetchDate)}
+                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1" title={portfolioSummary.fetchDate}>
+                      {formatDateTime(portfolioSummary.fetchDate)}
                     </p>
                   </div>
                 </div>
@@ -297,43 +312,47 @@ export default function Portfolio() {
             <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Allocation Analysis</h2>
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Target Allocation</h3>
-                  <div className="space-y-2">
-                    {Object.entries(portfolioData.allocationAnalysis.targetAllocation).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
+                {portfolioData.allocationAnalysis && (
+                  <>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Target Allocation</h3>
+                      <div className="space-y-2">
+                        {Object.entries(portfolioData.allocationAnalysis.targetAllocation).map(([key, value]) => (
+                          <div key={key} className="flex justify-between items-center">
+                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Current Allocation</h3>
-                  <div className="space-y-2">
-                    {Object.entries(portfolioData.allocationAnalysis.currentAllocation).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Current Allocation</h3>
+                      <div className="space-y-2">
+                        {Object.entries(portfolioData.allocationAnalysis.currentAllocation).map(([key, value]) => (
+                          <div key={key} className="flex justify-between items-center">
+                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Allocation Differences</h3>
-                  <div className="space-y-2">
-                    {Object.entries(portfolioData.allocationAnalysis.allocationDifferences).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                        <span className={`font-medium ${value.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                          {value}
-                        </span>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Allocation Differences</h3>
+                      <div className="space-y-2">
+                        {Object.entries(portfolioData.allocationAnalysis.allocationDifferences).map(([key, value]) => (
+                          <div key={key} className="flex justify-between items-center">
+                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
+                            <span className={`font-medium ${value.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                              {value}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
             </Card>
           </div>
@@ -370,93 +389,129 @@ export default function Portfolio() {
                     </div>
                   </div>
 
-                  {/* Instruments Table */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-100 dark:bg-gray-900">
-                        <tr>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Instrument
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Ticker
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Type
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Quantity
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Invested
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Current Value
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Result
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            Div. Yield
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            1W Perf.
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            1M Perf.
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            3M Perf.
-                          </th>
-                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            1Y Perf.
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {portfolio.instruments.map((instrument, instrumentIndex) => (
-                          <tr key={instrumentIndex} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {instrument.fullName}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {instrument.ticker}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {instrument.type}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                              {instrument.ownedQuantity.toFixed(2)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                              {formatCurrency(instrument.investedValue, user.settings.currency)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                              {formatCurrency(instrument.currentValue, user.settings.currency)}
-                            </td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${instrument.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {formatCurrency(instrument.resultValue, user.settings.currency, true)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                              {instrument.dividendYield ? `${instrument.dividendYield}%` : 'N/A'}
-                            </td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1week >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {instrument.performance_1week ? formatPercentage(instrument.performance_1week) : 'N/A'}
-                            </td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1month >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {instrument.performance_1month ? formatPercentage(instrument.performance_1month) : 'N/A'}
-                            </td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_3months >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {instrument.performance_3months ? formatPercentage(instrument.performance_3months) : 'N/A'}
-                            </td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1year >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {instrument.performance_1year ? formatPercentage(instrument.performance_1year) : 'N/A'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Instruments Table - Now using SortableTable */}
+                  <SortableTable
+                    data={portfolio.instruments}
+                    itemsPerPage={10}
+                    emptyMessage="No instruments found in this portfolio."
+                    columns={[
+                      {
+                        key: "fullName",
+                        header: "Instrument",
+                        sortable: true,
+                        filterable: true,
+                        render: (item) => (
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{item.fullName}</span>
+                        )
+                      },
+                      {
+                        key: "ticker",
+                        header: "Ticker",
+                        sortable: true,
+                        filterable: true,
+                        render: (item) => (
+                          <span className="text-gray-500 dark:text-gray-400">{item.ticker}</span>
+                        )
+                      },
+                      {
+                        key: "type",
+                        header: "Type",
+                        sortable: true,
+                        filterable: true,
+                        render: (item) => (
+                          <span className="text-gray-500 dark:text-gray-400">{item.type}</span>
+                        )
+                      },
+                      {
+                        key: "ownedQuantity",
+                        header: "Quantity",
+                        sortable: true,
+                        render: (item) => (
+                          <span className="text-gray-900 dark:text-gray-100">{item.ownedQuantity.toFixed(2)}</span>
+                        )
+                      },
+                      {
+                        key: "investedValue",
+                        header: "Invested",
+                        sortable: true,
+                        render: (item) => (
+                          <span className="text-gray-900 dark:text-gray-100">
+                            {formatCurrency(item.investedValue, user.settings.currency)}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "currentValue",
+                        header: "Current Value",
+                        sortable: true,
+                        render: (item) => (
+                          <span className="text-gray-900 dark:text-gray-100">
+                            {formatCurrency(item.currentValue, user.settings.currency)}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "resultValue",
+                        header: "Result",
+                        sortable: true,
+                        render: (item) => (
+                          <span className={`font-semibold ${item.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {formatCurrency(item.resultValue, user.settings.currency, true)}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "dividendYield",
+                        header: "Div. Yield",
+                        sortable: true,
+                        render: (item) => (
+                          <span className="text-gray-900 dark:text-gray-100">
+                            {item.dividendYield ? `${item.dividendYield}%` : 'N/A'}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "performance_1week",
+                        header: "1W Perf.",
+                        sortable: true,
+                        render: (item) => (
+                          <span className={`${item.performance_1week >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {item.performance_1week ? formatPercentage(item.performance_1week) : 'N/A'}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "performance_1month",
+                        header: "1M Perf.",
+                        sortable: true,
+                        render: (item) => (
+                          <span className={`${item.performance_1month >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {item.performance_1month ? formatPercentage(item.performance_1month) : 'N/A'}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "performance_3months",
+                        header: "3M Perf.",
+                        sortable: true,
+                        render: (item) => (
+                          <span className={`${item.performance_3months >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {item.performance_3months ? formatPercentage(item.performance_3months) : 'N/A'}
+                          </span>
+                        )
+                      },
+                      {
+                        key: "performance_1year",
+                        header: "1Y Perf.",
+                        sortable: true,
+                        render: (item) => (
+                          <span className={`${item.performance_1year >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {item.performance_1year ? formatPercentage(item.performance_1year) : 'N/A'}
+                          </span>
+                        )
+                      }
+                    ]}
+                  />
                 </div>
               </Card>
             ))}
