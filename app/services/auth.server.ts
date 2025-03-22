@@ -2,11 +2,17 @@
 import { Authenticator } from "remix-auth";
 import { FormStrategy } from "remix-auth-form";
 import { sessionStorage } from "~/services/session.server";
-import { verifyLogin } from "~/db/user.server";
+import { verifyLogin, getUserById } from "~/db/user.server";
 import { User } from "~/db/schema";
 import { redirect } from "@remix-run/node";
 
-export const authenticator = new Authenticator<User>(sessionStorage);
+// Define an interface for what's stored in the session
+interface SessionData {
+  userId: string;
+  lastVerified: string; // ISO timestamp for when the session was last validated
+}
+
+export const authenticator = new Authenticator<SessionData>(sessionStorage);
 
 authenticator.use(
   new FormStrategy(async ({ form }) => {
@@ -19,24 +25,47 @@ authenticator.use(
       throw new Error("Invalid username or password");
     }
 
-    console.log("FormStrategy: Authentication successful in strategy. About to commit session... ");
-    const authenticatedUser = user;
-
-    console.log("FormStrategy: Strategy function completed successfully. Returning user.");
-    return authenticatedUser;
+    console.log("FormStrategy: Authentication successful in strategy.");
+    return {
+      userId: user.id,
+      lastVerified: new Date().toISOString(),
+    };
   }),
   "user-pass"
 );
 
-// Create isAuthenticated function
+// Check if session is valid and fetch fresh user data from DB
 export async function isAuthenticated(request: Request): Promise<User | null> {
   try {
     const session = await sessionStorage.getSession(request.headers.get("Cookie"));
-    const user = session.get("user");
-    return user; // Returns user object if authenticated, null otherwise
+    const userId = session.get("userId");
+
+    if (!userId) {
+      console.log("isAuthenticated: No userId found in session.");
+      return null;
+    }
+
+    // Fetch the user from the database to ensure the session data is still valid
+    const user = getUserById(userId);
+    if (!user) {
+      console.log("isAuthenticated: User not found in database.");
+      return null;
+    }
+
+    // Optional: Add a time-based validation (e.g., session expires after 24 hours)
+    const lastVerified = new Date(session.get("lastVerified"));
+    const now = new Date();
+    const hoursSinceLastVerified = (now.getTime() - lastVerified.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLastVerified > 24) {
+      console.log("isAuthenticated: Session expired.");
+      return null; // Force re-authentication
+    }
+
+    console.log("isAuthenticated: User verified successfully.");
+    return user;
   } catch (error) {
     console.error("Authentication error:", error);
-    return null; // Handle potential errors during authentication process
+    return null;
   }
 }
 
@@ -44,14 +73,10 @@ export async function requireAuthentication(request: Request, failureRedirect: s
   const user = await isAuthenticated(request);
   if (!user) {
     const currentPath = new URL(request.url).pathname;
-    if (currentPath !== failureRedirect) { // Check if not already on the failureRedirect page
+    if (currentPath !== failureRedirect) {
       throw redirect(`${failureRedirect}?redirectTo=${currentPath}`);
-    } else {
-      // If already on the failureRedirect page, maybe return null or throw a different error?
-      // Or simply do nothing and let the component handle the unauthenticated state if needed.
-      // For now, let's just return null to indicate unauthenticated state without redirecting again.
-      return null; // Or handle differently based on desired behavior when already on login page.
     }
+    return null; // Handle case where already on login page
   }
   return user;
 }
@@ -59,6 +84,8 @@ export async function requireAuthentication(request: Request, failureRedirect: s
 export async function commitSession(request: Request, user: User) {
   const session = await sessionStorage.getSession(request.headers.get("Cookie"));
   session.set("user", user);
+  session.set("userId", user.id)
+  session.set("lastVerified", new Date().toISOString())
   return await sessionStorage.commitSession(session);
 }
 

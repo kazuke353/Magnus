@@ -24,13 +24,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     try {
       // First try to get cached data
       const cachedData = await getPortfolioData(user.id);
-      
+
       if (cachedData) {
         portfolioData = cachedData;
       } else {
         // If no cached data, fetch fresh data
         portfolioData = await getPortfolioData(user.settings.monthlyBudget, user.settings.country);
-        
+
         if (portfolioData) {
           await savePortfolioData(user.id, portfolioData);
         }
@@ -58,7 +58,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       try {
         // Force fresh data fetch
         const portfolioData = await getPortfolioData(user.settings.monthlyBudget, user.settings.country);
-        
+
         if (portfolioData) {
           await savePortfolioData(user.id, portfolioData);
           return json({ success: true, portfolioData, message: "Portfolio data refreshed successfully" });
@@ -67,9 +67,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       } catch (error) {
         console.error("Error refreshing portfolio data:", error);
-        return json({ 
-          success: false, 
-          error: "Error refreshing portfolio data: " + (error instanceof Error ? error.message : "Unknown error") 
+        return json({
+          success: false,
+          error: "Error refreshing portfolio data: " + (error instanceof Error ? error.message : "Unknown error")
         }, { status: 500 });
       }
     }
@@ -86,8 +86,8 @@ export default function Portfolio() {
   const submit = useSubmit();
 
   // Handle potential error in loader data
-  const { user, portfolioData: initialPortfolioData, error } = loaderData.error 
-    ? { user: null, portfolioData: null, error: loaderData.error } 
+  const { user, portfolioData: initialPortfolioData, error } = loaderData.error
+    ? { user: null, portfolioData: null, error: loaderData.error }
     : { ...loaderData, error: null };
 
   const [portfolioData, setPortfolioData] = useState<PerformanceMetrics | null>(initialPortfolioData);
@@ -117,7 +117,7 @@ export default function Portfolio() {
     const formData = new FormData();
     formData.append("_action", "refresh");
     submit(formData, { method: "post" });
-    
+
     // Show loading notification
     setNotification({
       type: "info",
@@ -125,14 +125,14 @@ export default function Portfolio() {
     });
   };
 
-  const isRefreshing = navigation.state === "submitting" && 
+  const isRefreshing = navigation.state === "submitting" &&
     navigation.formData?.get("_action") === "refresh";
 
   // Handle successful refresh
   useEffect(() => {
     if (navigation.state === "idle" && navigation.formData?.get("_action") === "refresh") {
       const actionData = navigation.formData;
-      
+
       if (actionData && "success" in actionData && actionData.success) {
         setNotification({
           type: "success",
@@ -168,7 +168,7 @@ export default function Portfolio() {
   return (
     <div className="space-y-8 px-4 md:px-8 lg:px-16 xl:px-24">
       {isRefreshing && <LoadingIndicator fullScreen message="Refreshing portfolio data..." />}
-      
+
       {notification && (
         <Notification
           type={notification.type}
@@ -176,7 +176,7 @@ export default function Portfolio() {
           onClose={() => setNotification(null)}
         />
       )}
-      
+
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
@@ -293,7 +293,7 @@ export default function Portfolio() {
                 <PortfolioChart portfolioData={portfolioData} />
               </div>
             </Card>
-            
+
             <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Allocation Analysis</h2>
               <div className="space-y-4">
@@ -308,7 +308,7 @@ export default function Portfolio() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Current Allocation</h3>
                   <div className="space-y-2">
@@ -320,16 +320,16 @@ export default function Portfolio() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Allocation Differences</h3>
                   <div className="space-y-2">
                     {Object.entries(portfolioData.allocationAnalysis.allocationDifferences).map(([key, value]) => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                        <span className={`font-medium ${
-                          value.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                        }`}>{value}</span>
+                        <span className={`font-medium ${value.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                          {value}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -396,7 +396,7 @@ export default function Portfolio() {
                           <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                             Result
                           </th>
-                           <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                             Div. Yield
                           </th>
                           <th scope="col" className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -421,67 +421,65 @@ export default function Portfolio() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               {instrument.ticker}
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-  {instrument.ticker}
-</td>
-<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-  {instrument.type}
-</td>
-<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-  {instrument.ownedQuantity.toFixed(2)}
-</td>
-<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-  {formatCurrency(instrument.investedValue, user.settings.currency)}
-</td>
-<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-  {formatCurrency(instrument.currentValue, user.settings.currency)}
-</td>
-<td className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${instrument.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-  {formatCurrency(instrument.resultValue, user.settings.currency, true)}
-</td>
-<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-  {instrument.dividendYield ? `${instrument.dividendYield}%` : 'N/A'}
-</td>
-<td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1week >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-  {instrument.performance_1week ? formatPercentage(instrument.performance_1week) : 'N/A'}
-</td>
-<td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1month >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-  {instrument.performance_1month ? formatPercentage(instrument.performance_1month) : 'N/A'}
-</td>
-<td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_3months >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-  {instrument.performance_3months ? formatPercentage(instrument.performance_3months) : 'N/A'}
-</td>
-<td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1year >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-  {instrument.performance_1year ? formatPercentage(instrument.performance_1year) : 'N/A'}
-</td>
-</tr>
-))}
-</tbody>
-</table>
-</div>
-</div>
-</Card>
-))}
-</section>
+                              {instrument.type}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {instrument.ownedQuantity.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {formatCurrency(instrument.investedValue, user.settings.currency)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {formatCurrency(instrument.currentValue, user.settings.currency)}
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${instrument.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {formatCurrency(instrument.resultValue, user.settings.currency, true)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                              {instrument.dividendYield ? `${instrument.dividendYield}%` : 'N/A'}
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1week >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {instrument.performance_1week ? formatPercentage(instrument.performance_1week) : 'N/A'}
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1month >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {instrument.performance_1month ? formatPercentage(instrument.performance_1month) : 'N/A'}
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_3months >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {instrument.performance_3months ? formatPercentage(instrument.performance_3months) : 'N/A'}
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm ${instrument.performance_1year >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {instrument.performance_1year ? formatPercentage(instrument.performance_1year) : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </section>
 
-{/* Chat assistant promo */}
-<Card className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg rounded-xl p-6">
-<div className="flex flex-col md:flex-row items-center justify-between">
-<div className="mb-4 md:mb-0">
-<h3 className="text-xl font-bold mb-2">Need help with your finances?</h3>
-<p className="text-gray-100 text-lg">Chat with our AI assistant to get personalized advice and insights.</p>
-</div>
-<Link
-to="/chat"
-className="px-5 py-3 bg-white text-blue-600 rounded-md font-semibold hover:bg-blue-50 transition-colors shadow-md"
->
-<FiMessageSquare className="inline-block mr-2" />
-Start chatting
-</Link>
-</div>
-</Card>
-</>
-)}
-</div>
-);
+          {/* Chat assistant promo */}
+          <Card className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg rounded-xl p-6">
+            <div className="flex flex-col md:flex-row items-center justify-between">
+              <div className="mb-4 md:mb-0">
+                <h3 className="text-xl font-bold mb-2">Need help with your finances?</h3>
+                <p className="text-gray-100 text-lg">Chat with our AI assistant to get personalized advice and insights.</p>
+              </div>
+              <Link
+                to="/chat"
+                className="px-5 py-3 bg-white text-blue-600 rounded-md font-semibold hover:bg-blue-50 transition-colors shadow-md"
+              >
+                <FiMessageSquare className="inline-block mr-2" />
+                Start chatting
+              </Link>
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
 }

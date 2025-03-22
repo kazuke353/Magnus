@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Calendar from 'react-calendar';
+import Calendar from './Calendar'
 import { format, isEqual, parseISO, isValid } from 'date-fns';
 import { Task } from '~/db/schema';
 import Card from './Card';
@@ -7,7 +7,7 @@ import TaskItem from './TaskItem';
 import { FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi';
 
 // Import calendar styles
-import 'react-calendar/dist/Calendar.css';
+import '~/styles/calendar.css';
 
 interface TaskCalendarProps {
   tasks: Task[];

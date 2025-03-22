@@ -3,10 +3,12 @@ import type { LoaderFunctionArgs } from "@remix-run/node"; // Use 'type' import
 import { json } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
 import { getUserTasks, Task } from "~/db/tasks.server";
-import { fetchPortfolioData, PortfolioData } from "~/services/portfolio.server"; // Import PortfolioData type
+import { getPortfolioData, savePortfolioData } from "~/services/portfolio.server";
+import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
 import Card from "~/components/Card";
 import { FiCalendar, FiDollarSign, FiPieChart, FiMessageSquare } from "react-icons/fi";
 import { formatDate } from "~/utils/date";
+import { errorResponse, createApiError } from "~/utils/error-handler";
 
 export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly type LoaderFunctionArgs
   const user = await requireAuthentication(request, "/login");
@@ -23,7 +25,26 @@ export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly
     .slice(0, 5);
 
   // Get portfolio data
-  const portfolioData = await fetchPortfolioData(user.id);
+  let portfolioData: PerformanceMetrics | null = null;
+  
+  try {
+    // First try to get cached data
+    const cachedData = await getPortfolioData(user.id);
+
+    if (cachedData) {
+      portfolioData = cachedData;
+    } else {
+      // If no cached data, fetch fresh data
+      portfolioData = await getPortfolioData(user.settings.monthlyBudget, user.settings.country);
+
+      if (portfolioData) {
+        await savePortfolioData(user.id, portfolioData);
+      }
+    }
+  } catch (loadError) {
+    console.error("Error loading portfolio data in loader:", loadError);
+    throw createApiError("Failed to load portfolio data", { originalError: loadError });
+  }
 
   return json({
     user,
@@ -35,7 +56,7 @@ export const loader: LoaderFunctionArgs = async ({ request }) => { // Explicitly
 interface DashboardLoaderData { // Define interface for loader data
   user: Awaited<ReturnType<typeof requireAuthentication>>;
   upcomingTasks: Task[];
-  portfolioData: PortfolioData | null; // portfolioData can be null
+  portfolioData: PerformanceMetrics | null; // portfolioData can be null
 }
 
 
