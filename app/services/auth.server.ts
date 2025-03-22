@@ -1,7 +1,7 @@
 // auth.server.ts
 import { Authenticator } from "remix-auth";
 import { FormStrategy } from "remix-auth-form";
-import { sessionStorage } from "~/services/session.server";
+import { sessionStorage, getUser as getSessionUser, setUserSession } from "~/services/session.server";
 import { verifyLogin, getUserById } from "~/db/user.server";
 import { User } from "~/db/schema";
 import { redirect } from "@remix-run/node";
@@ -37,32 +37,7 @@ authenticator.use(
 // Check if session is valid and fetch fresh user data from DB
 export async function isAuthenticated(request: Request): Promise<User | null> {
   try {
-    const session = await sessionStorage.getSession(request.headers.get("Cookie"));
-    const userId = session.get("userId");
-
-    if (!userId) {
-      console.log("isAuthenticated: No userId found in session.");
-      return null;
-    }
-
-    // Fetch the user from the database to ensure the session data is still valid
-    const user = getUserById(userId);
-    if (!user) {
-      console.log("isAuthenticated: User not found in database.");
-      return null;
-    }
-
-    // Optional: Add a time-based validation (e.g., session expires after 24 hours)
-    const lastVerified = new Date(session.get("lastVerified"));
-    const now = new Date();
-    const hoursSinceLastVerified = (now.getTime() - lastVerified.getTime()) / (1000 * 60 * 60);
-    if (hoursSinceLastVerified > 24) {
-      console.log("isAuthenticated: Session expired.");
-      return null; // Force re-authentication
-    }
-
-    console.log("isAuthenticated: User verified successfully.");
-    return user;
+    return await getSessionUser(request);
   } catch (error) {
     console.error("Authentication error:", error);
     return null;
@@ -82,11 +57,7 @@ export async function requireAuthentication(request: Request, failureRedirect: s
 }
 
 export async function commitSession(request: Request, user: User) {
-  const session = await sessionStorage.getSession(request.headers.get("Cookie"));
-  session.set("user", user);
-  session.set("userId", user.id)
-  session.set("lastVerified", new Date().toISOString())
-  return await sessionStorage.commitSession(session);
+  return await setUserSession(request, user.id);
 }
 
 export async function logout(request: Request, redirectTo: string = "/login") {
