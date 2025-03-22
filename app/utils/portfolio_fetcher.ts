@@ -1,10 +1,14 @@
 import yahooFinance from 'yahoo-finance2';
 import { format, subDays, subMonths, subYears } from 'date-fns';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+// Environment variables & configuration
 const api_key = process.env.API_KEY;
+if (!api_key) {
+  throw new Error('API_KEY environment variable is not set');
+}
 
 const headers = { "Authorization": api_key, "Accept": "application/json" };
 
@@ -14,9 +18,15 @@ const instrumentsMetadataURL = "https://live.trading212.com/api/v0/equity/metada
 const cashURL = "https://live.trading212.com/api/v0/equity/account/cash";
 
 // In-memory cache for API responses
-const apiCache = new Map<string, { data: any; timestamp: number }>();
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const apiCache = new Map<string, CacheEntry>();
 const CACHE_EXPIRATION_TIME = 5 * 60 * 1000; // 5 minutes
 
+// Interfaces
 export interface InstrumentMetadata {
     ticker: string;
     name: string;
@@ -27,7 +37,7 @@ export interface InstrumentMetadata {
     minTradeQuantity: number;
 }
 
-export interface PieInstrument extends Record<string, any> { // Allow extra properties
+export interface PieInstrument {
     currentShare: number;
     expectedShare: number;
     issues: boolean;
@@ -40,36 +50,26 @@ export interface PieInstrument extends Record<string, any> { // Allow extra prop
     addedToMarket?: string;
     currencyCode?: string;
     maxOpenQuantity?: number;
-    minTradeQuantity?: string; // Corrected type to string to match python None return case
+    minTradeQuantity?: string;
     type?: string;
     dividendYield: number;
     performance_1week?: number | null;
     performance_1month?: number | null;
     performance_3months?: number | null;
     performance_1year?: number | null;
+    [key: string]: any; // Allow extra properties
 }
 
-export interface PieData extends Record<string, any> { // Allow extra properties
+export interface PieData {
     name: string;
     creationDate: string;
     dividendCashAction: string;
-    instruments: PieInstrument;
+    instruments: PieInstrument[];
     totalInvested: number;
     totalResult: number;
     returnPercentage: number;
     fetchDate?: string;
-}
-
-export interface PerformanceMetrics extends Record<string, any> { // Allow extra properties
-    totalInvestedOverall: number;
-    totalResultOverall: number;
-    freeCashAvailable: number;
-    returnPercentageOverall: number;
-    fetchDate?: string;
-    allocationAnalysis?: AllocationAnalysis; // Type for allocationAnalysis
-    rebalanceInvestmentForTarget?: TargetInvestments | null; // Type for planned_investment_expected_deposit_date
-    portfolio?: PieData| null; // Add portfolio to PerformanceMetrics
-    overallSummary?: OverallSummary | null; // Add overallSummary to PerformanceMetrics
+    [key: string]: any; // Allow extra properties
 }
 
 export interface OverallSummary {
@@ -112,11 +112,31 @@ export interface TargetInvestments {
     [pieType: string]: number;
 }
 
+export interface PerformanceMetrics {
+    portfolio?: PieData[] | null;
+    overallSummary?: OverallSummary | null;
+    allocationAnalysis?: AllocationAnalysis;
+    rebalanceInvestmentForTarget?: TargetInvestments | null;
+    freeCashAvailable: number;
+    totalInvestedOverall?: number;
+    totalResultOverall?: number;
+    returnPercentageOverall?: number;
+    fetchDate?: string;
+    [key: string]: any; // Allow extra properties
+}
 
-async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = 'GET', headers: Record<string, string>, delay: number = 5, retries: number = 3): Promise<any | null> {
-    const cacheKey = url;
+// API request with exponential backoff
+async function exponentialBackoffRequest(
+    url: string, 
+    method: 'GET' | 'POST' = 'GET', 
+    headers: Record<string, string>, 
+    delay: number = 5, 
+    retries: number = 3
+): Promise<AxiosResponse | null> {
+    const cacheKey = `${method}:${url}`;
     const cachedResponse = apiCache.get(cacheKey);
 
+    // Return cached response if valid
     if (cachedResponse && Date.now() - cachedResponse.timestamp < CACHE_EXPIRATION_TIME) {
         return cachedResponse.data;
     }
@@ -125,13 +145,15 @@ async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = '
     while (attempts <= retries) {
         try {
             const response = await axios({
-                method: method,
-                url: url,
-                headers: headers
+                method,
+                url,
+                headers,
+                timeout: 10000 // 10 second timeout
             });
+            
             if (response.status >= 200 && response.status < 300) {
                 apiCache.set(cacheKey, { data: response, timestamp: Date.now() });
-                console.log(`Request for ${url} successful.`)
+                console.log(`Request for ${url} successful.`);
                 return response;
             } else {
                 console.log(`Request for ${url} failed with status ${response.status}, retrying in ${delay} seconds...`);
@@ -150,21 +172,28 @@ async function exponentialBackoffRequest(url: string, method: 'GET' | 'POST' = '
     return null;
 }
 
+// Fetch all instruments metadata
 async function getAllInstrumentsMetadata(): Promise<Record<string, InstrumentMetadata> | null> {
     const response = await exponentialBackoffRequest(instrumentsMetadataURL, 'GET', headers, 5);
-    if (response === null) {
+    if (!response) {
         console.log("Failed to fetch instruments metadata.");
         return null;
     }
+    
     try {
-        const instruments = response.data as InstrumentMetadata;
+        const instruments = response.data as InstrumentMetadata[];
+        if (!Array.isArray(instruments)) {
+            console.error("Instruments metadata is not an array");
+            return null;
+        }
+        
         const metadataByTicker: Record<string, InstrumentMetadata> = {};
         instruments.forEach(instrument => {
             metadataByTicker[instrument.ticker] = instrument;
         });
         return metadataByTicker;
     } catch (e: any) {
-        console.error(`Error parsing instruments metadata: ${e}`);
+        console.error(`Error parsing instruments metadata: ${e.message}`);
         try {
             console.error(`Response Content: ${JSON.stringify(response.data)}`);
         } catch (e) {
@@ -174,6 +203,7 @@ async function getAllInstrumentsMetadata(): Promise<Record<string, InstrumentMet
     }
 }
 
+// Format Yahoo Finance ticker
 async function formatYahooTicker(ticker: string): Promise<string> {
     let formatted = ticker;
 
@@ -187,28 +217,32 @@ async function formatYahooTicker(ticker: string): Promise<string> {
         formatted = formatted.slice(0, -3);
     }
     if (formatted.endsWith('1.L')) {
-        formatted = formatted.slice(0, -3);
-        formatted += '.L';
+        formatted = formatted.slice(0, -3) + '.L';
     }
 
-    //Add more specific ticker formating here.
-    if(ticker === 'BRK_B_US_EQ'){
-        formatted = 'BRK-B';
-    }
-    if(ticker === 'ALVd_EQ'){
-        formatted = 'ALV.DE';
-    }
-    if(ticker === 'ABNa_EQ'){
-        formatted = 'ABN.AS';
+    // Specific ticker formatting
+    const tickerMap: Record<string, string> = {
+        'BRK_B_US_EQ': 'BRK-B',
+        'ALVd_EQ': 'ALV.DE',
+        'ABNa_EQ': 'ABN.AS'
+    };
+
+    if (ticker in tickerMap) {
+        formatted = tickerMap[ticker];
     }
 
     return formatted;
 }
 
-async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<string, InstrumentMetadata>): Promise<PieData | null> {
+// Fetch details for a specific pie
+async function fetchPieDetails(
+    pieId: string, 
+    allInstrumentsMetadata: Record<string, InstrumentMetadata>
+): Promise<PieData | null> {
     const pieDetailsURL = `${piesListURL}/${pieId}`;
     const response = await exponentialBackoffRequest(pieDetailsURL, 'GET', headers, 5);
-    if (response === null) {
+    
+    if (!response) {
         console.log(`Could not fetch details for pie ID ${pieId}`);
         return null;
     }
@@ -217,9 +251,9 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
         const pieDetails = response.data;
         const settings = pieDetails.settings || {};
         const pieData: PieData = {
-            name: settings.name,
-            creationDate: settings.creationDate,
-            dividendCashAction: settings.dividendCashAction,
+            name: settings.name || 'Unnamed Pie',
+            creationDate: settings.creationDate || new Date().toISOString(),
+            dividendCashAction: settings.dividendCashAction || 'unknown',
             instruments: [],
             totalInvested: 0,
             totalResult: 0,
@@ -230,11 +264,11 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
         for (const instrument of instruments) {
             const result = instrument.result || {};
             const instrumentData: PieInstrument = {
-                currentShare: instrument.currentShare,
-                expectedShare: instrument.expectedShare,
-                issues: instrument.issues,
-                ownedQuantity: instrument.ownedQuantity,
-                ticker: instrument.ticker,
+                currentShare: instrument.currentShare || 0,
+                expectedShare: instrument.expectedShare || 0,
+                issues: instrument.issues || false,
+                ownedQuantity: instrument.ownedQuantity || 0,
+                ticker: instrument.ticker || '',
                 investedValue: result.priceAvgInvestedValue || 0,
                 currentValue: result.priceAvgValue || 0,
                 resultValue: (result.priceAvgValue || 0) - (result.priceAvgInvestedValue || 0),
@@ -242,53 +276,63 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
             };
 
             const ticker = instrument.ticker;
-            const fullInstrumentData = allInstrumentsMetadata[ticker];
-            if (fullInstrumentData) {
+            if (ticker && allInstrumentsMetadata && ticker in allInstrumentsMetadata) {
+                const fullInstrumentData = allInstrumentsMetadata[ticker];
                 instrumentData.fullName = fullInstrumentData.name;
                 instrumentData.addedToMarket = fullInstrumentData.addedOn;
                 instrumentData.currencyCode = fullInstrumentData.currencyCode;
                 instrumentData.maxOpenQuantity = fullInstrumentData.maxOpenQuantity;
-                instrumentData.minTradeQuantity = fullInstrumentData.minTradeQuantity as string; // Corrected type assertion
+                instrumentData.minTradeQuantity = String(fullInstrumentData.minTradeQuantity);
                 instrumentData.type = fullInstrumentData.type;
             }
 
-            const formattedTicker = await formatYahooTicker(ticker);
             try {
-                const yfQuote = await yahooFinance.quote(`${formattedTicker}`); // Fetch quote first
-                instrumentData.dividendYield = yfQuote?.dividendYield?.toFixed(2) || 0.0;
+                const formattedTicker = await formatYahooTicker(ticker);
+                const yfQuote = await yahooFinance.quote(formattedTicker);
+                
+                instrumentData.dividendYield = yfQuote?.dividendYield ? 
+                    parseFloat(yfQuote.dividendYield.toFixed(2)) : 0.0;
 
                 const now = new Date();
                 const pastYear = subYears(now, 1);
                 const queryOptions = { period1: pastYear, interval: '1d' };
-                const historicalData = await yahooFinance.historical(formattedTicker, queryOptions);
+                
+                try {
+                    const historicalData = await yahooFinance.historical(formattedTicker, queryOptions);
 
-                if (historicalData && historicalData.length > 0) {
-                    const todayPrice = historicalData[historicalData.length - 1].close;
+                    if (historicalData && historicalData.length > 0) {
+                        const todayPrice = historicalData[historicalData.length - 1].close;
 
-                    const calculatePerformance = (daysAgo: number): number | null => {
-                        const pastDate = subDays(now, daysAgo);
-                        const pastData = historicalData.filter(item => new Date(item.date) <= pastDate);
-                        if (pastData.length > 0) {
-                            const pastPrice = pastData[pastData.length - 1].close;
-                            return ((todayPrice - pastPrice) / pastPrice) * 100;
-                        }
-                        return null;
-                    };
+                        const calculatePerformance = (daysAgo: number): number | null => {
+                            const pastDate = subDays(now, daysAgo);
+                            const pastData = historicalData.filter(item => new Date(item.date) <= pastDate);
+                            if (pastData.length > 0) {
+                                const pastPrice = pastData[pastData.length - 1].close;
+                                return ((todayPrice - pastPrice) / pastPrice) * 100;
+                            }
+                            return null;
+                        };
 
-                    instrumentData.performance_1week = calculatePerformance(7);
-                    instrumentData.performance_1month = calculatePerformance(30);
-                    instrumentData.performance_3months = calculatePerformance(90);
-                    instrumentData.performance_1year = calculatePerformance(365);
-                } else {
+                        instrumentData.performance_1week = calculatePerformance(7);
+                        instrumentData.performance_1month = calculatePerformance(30);
+                        instrumentData.performance_3months = calculatePerformance(90);
+                        instrumentData.performance_1year = calculatePerformance(365);
+                    } else {
+                        console.warn(`No historical data fetched for ${formattedTicker}`);
+                        instrumentData.performance_1week = null;
+                        instrumentData.performance_1month = null;
+                        instrumentData.performance_3months = null;
+                        instrumentData.performance_1year = null;
+                    }
+                } catch (histError: any) {
+                    console.error(`Error fetching historical data for ${formattedTicker}: ${histError.message}`);
                     instrumentData.performance_1week = null;
                     instrumentData.performance_1month = null;
                     instrumentData.performance_3months = null;
                     instrumentData.performance_1year = null;
-                    console.warn(`No historical data fetched for ${formattedTicker}`); // Warn if no historical data
                 }
-
             } catch (e: any) {
-                console.error(`Error fetching data for ${ticker} (Formatted: ${formattedTicker}) from Yahoo Finance: ${e}`);
+                console.error(`Error fetching data for ${ticker} from Yahoo Finance: ${e.message}`);
                 instrumentData.dividendYield = 0.0;
                 instrumentData.performance_1week = null;
                 instrumentData.performance_1month = null;
@@ -299,15 +343,17 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
             pieData.instruments.push(instrumentData);
         }
 
+        // Calculate totals
         pieData.totalInvested = pieData.instruments.reduce((sum, instr) => sum + instr.investedValue, 0);
         pieData.totalResult = pieData.instruments.reduce((sum, instr) => sum + instr.resultValue, 0);
-        pieData.returnPercentage = pieData.totalInvested !== 0 ? (pieData.totalResult / pieData.totalInvested) * 100 : 0;
+        pieData.returnPercentage = pieData.totalInvested !== 0 ? 
+            (pieData.totalResult / pieData.totalInvested) * 100 : 0;
         pieData.fetchDate = format(new Date(), "yyyy-MM-dd HH:mm:ss");
 
         return pieData;
 
     } catch (e: any) {
-        console.error(`Error processing pie details for pie ID ${pieId}: ${e}`);
+        console.error(`Error processing pie details for pie ID ${pieId}: ${e.message}`);
         try {
             console.error(`Response Content: ${JSON.stringify(response.data)}`);
         } catch (e) {
@@ -317,46 +363,64 @@ async function fetchPieDetails(pieId: string, allInstrumentsMetadata: Record<str
     }
 }
 
-async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentMetadata>, delayBetweenPies: number = 1): Promise<[PieData, OverallSummary] | [null, null]> {
+// Fetch data for all pies
+async function getAllPiesData(
+    allInstrumentsMetadata: Record<string, InstrumentMetadata>, 
+    delayBetweenPies: number = 1
+): Promise<[PieData[] | null, OverallSummary | null]> {
     const response = await exponentialBackoffRequest(piesListURL, 'GET', headers, 5);
-    if (response === null) {
+    
+    if (!response) {
         console.log("Failed to fetch list of pies.");
         return [null, null];
     }
 
     try {
-        const piesList = response.data as any;
-        const allPies: PieData= [];
+        const piesList = response.data;
+        if (!Array.isArray(piesList)) {
+            console.error("Pies list is not an array");
+            return [null, null];
+        }
+
+        const allPies: PieData[] = [];
         let totalInvestedOverall = 0;
         let totalResultOverall = 0;
 
         for (const pie of piesList) {
             const pieId = pie.id;
+            if (!pieId) {
+                console.warn("Pie without ID encountered, skipping");
+                continue;
+            }
+
             const pieData = await fetchPieDetails(pieId, allInstrumentsMetadata);
             if (pieData) {
                 allPies.push(pieData);
                 totalInvestedOverall += pieData.totalInvested || 0;
                 totalResultOverall += pieData.totalResult || 0;
             }
+            
+            // Add delay between API calls to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, delayBetweenPies * 1000));
         }
 
-        const returnPercentageOverall = totalInvestedOverall !== 0 ? (totalResultOverall / totalInvestedOverall) * 100 : 0;
+        const returnPercentageOverall = totalInvestedOverall !== 0 ? 
+            (totalResultOverall / totalInvestedOverall) * 100 : 0;
         const fetchDate = format(new Date(), "yyyy-MM-dd HH:mm:ss");
 
         const overallSummary: OverallSummary = {
             overallSummary: {
-                totalInvestedOverall: totalInvestedOverall,
-                totalResultOverall: totalResultOverall,
-                returnPercentageOverall: returnPercentageOverall,
-                fetchDate: fetchDate
+                totalInvestedOverall,
+                totalResultOverall,
+                returnPercentageOverall,
+                fetchDate
             }
         };
 
         return [allPies, overallSummary];
 
     } catch (e: any) {
-        console.error(`Error parsing list of pies: ${e}`);
+        console.error(`Error parsing list of pies: ${e.message}`);
         try {
             console.error(`Response Content: ${JSON.stringify(response.data)}`);
         } catch (e) {
@@ -366,30 +430,37 @@ async function getAllPiesData(allInstrumentsMetadata: Record<string, InstrumentM
     }
 }
 
-function validate_portfolio_data(portfolio_data: any): void {
-    /**Validates portfolio data format.*/
-    if (typeof portfolio_data !== 'object' || portfolio_data === null || !('portfolio' in portfolio_data)) {
-        throw new Error("Invalid portfolio data format.");
+// Portfolio data validation
+function validatePortfolioData(portfolioData: any): boolean {
+    if (typeof portfolioData !== 'object' || 
+        portfolioData === null || 
+        !('portfolio' in portfolioData)) {
+        console.error("Invalid portfolio data format.");
+        return false;
     }
+    return true;
 }
 
-function extract_overall_summary(portfolio_data: any): OverallSummary {
-    /**Extracts overall summary.*/
-    const overall_summary = portfolio_data.overallSummary as OverallSummary | undefined;
-    if (!overall_summary) {
-        throw new Error("No overall summary found");
+// Extract overall summary
+function extractOverallSummary(portfolioData: PerformanceMetrics): OverallSummary | null {
+    if (!portfolioData.overallSummary) {
+        console.error("No overall summary found");
+        return null;
     }
-    return overall_summary;
+    return portfolioData.overallSummary;
 }
 
-function extract_pies(portfolio: PieData): PieData{
-    /**Extracts pies (excluding overallSummary).*/
-    return portfolio.filter(pie => pie.name !== "OverallSummary"); // Assuming "overallSummary" was meant to be pie.name === "OverallSummary" based on context. If it's really about excluding a key named "overallSummary" in pie object, the condition should be adjusted.
+// Extract pies (excluding overallSummary)
+function extractPies(portfolio: PieData[] | null | undefined): PieData[] {
+    if (!portfolio || !Array.isArray(portfolio)) {
+        return [];
+    }
+    return portfolio.filter(pie => pie.name !== "OverallSummary");
 }
 
-function calculate_basic_performance_metrics(overall_summary: OverallSummary): Record<string, number> {
-    /**Calculates basic performance metrics.*/
-    const os = overall_summary.overallSummary;
+// Calculate basic performance metrics
+function calculateBasicPerformanceMetrics(overallSummary: OverallSummary): Record<string, number> {
+    const os = overallSummary.overallSummary;
     return {
         totalInvested: os.totalInvestedOverall,
         totalResult: os.totalResultOverall,
@@ -397,239 +468,332 @@ function calculate_basic_performance_metrics(overall_summary: OverallSummary): R
     };
 }
 
-function calculate_estimated_annual_dividend(portfolio_data: PerformanceMetrics, budget: number): number {
-    /**Calculates estimated annual dividend with budget impact.*/
-    let total_annual_dividend = 0;
-    const annual_budget = budget * 12;
+// Calculate estimated annual dividend with budget impact
+function calculateEstimatedAnnualDividend(portfolioData: PerformanceMetrics, budget: number): number {
+    let totalAnnualDividend = 0;
+    const annualBudget = budget * 12;
 
-    if (portfolio_data && portfolio_data.portfolio) {
-        let total_portfolio_value = 0;
-        for (const pie of portfolio_data.portfolio) {
-            if (pie.instruments) {
-                for (const instrument of pie.instruments) {
-                    total_portfolio_value += instrument.currentValue || 0.0;
-                }
-            }
-        }
+    if (!portfolioData.portfolio || !Array.isArray(portfolioData.portfolio)) {
+        return 0;
+    }
 
-        for (const pie of portfolio_data.portfolio) {
-            if (pie.instruments) {
-                for (const instrument of pie.instruments) {
-                    const dividend_yield = instrument.dividendYield || 0.0;
-                    const current_value = instrument.currentValue || 0.0;
-                    const annual_dividend_instrument = (current_value * dividend_yield) / 100.0;
-                    total_annual_dividend += annual_dividend_instrument;
-
-                    const allocation_ratio = total_portfolio_value ? current_value / total_portfolio_value : 0;
-                    const budget_allocation = annual_budget * allocation_ratio;
-                    const annual_dividend_from_budget = (budget_allocation * dividend_yield) / 100.0;
-                    total_annual_dividend += annual_dividend_from_budget;
-                }
+    // Calculate total portfolio value
+    let totalPortfolioValue = 0;
+    for (const pie of portfolioData.portfolio) {
+        if (pie.instruments && Array.isArray(pie.instruments)) {
+            for (const instrument of pie.instruments) {
+                totalPortfolioValue += instrument.currentValue || 0;
             }
         }
     }
 
-    return total_annual_dividend;
+    // Calculate dividend yield
+    for (const pie of portfolioData.portfolio) {
+        if (pie.instruments && Array.isArray(pie.instruments)) {
+            for (const instrument of pie.instruments) {
+                const dividendYield = instrument.dividendYield || 0;
+                const currentValue = instrument.currentValue || 0;
+                
+                // Current dividend
+                const annualDividendInstrument = (currentValue * dividendYield) / 100;
+                totalAnnualDividend += annualDividendInstrument;
+
+                // Future dividend from budget allocation
+                const allocationRatio = totalPortfolioValue > 0 ? 
+                    currentValue / totalPortfolioValue : 0;
+                const budgetAllocation = annualBudget * allocationRatio;
+                const annualDividendFromBudget = (budgetAllocation * dividendYield) / 100;
+                totalAnnualDividend += annualDividendFromBudget;
+            }
+        }
+    }
+
+    return totalAnnualDividend;
 }
 
-function extract_target_allocation_from_name(pie_name: string): [string | null, number | null] {
-    /**Extracts pie type and target allocation from pie name.*/
-    const parts = pie_name.split(" (");
+// Extract pie type and target allocation from pie name
+function extractTargetAllocationFromName(pieName: string): [string | null, number | null] {
+    const parts = pieName.split(" (");
     if (parts.length !== 2) {
         return [null, null];
     }
+    
     try {
-        const pie_type = parts[0].trim();
-        const target_allocation = parseFloat(parts[1].trim().slice(0, -1)); // Remove ')' and parse
-        return [pie_type, target_allocation];
-    } catch (ValueError) {
+        const pieType = parts[0].trim();
+        const percentageStr = parts[1].replace(')', '').trim();
+        const targetAllocation = parseFloat(percentageStr);
+        
+        if (isNaN(targetAllocation)) {
+            return [null, null];
+        }
+        
+        return [pieType, targetAllocation];
+    } catch (error) {
+        console.warn(`Failed to parse allocation from pie name: ${pieName}`);
         return [null, null];
     }
 }
 
-function calculate_current_allocation(pies: PieData): [CurrentAllocation, TargetAllocationPercentages] {
-    /**Calculates current and target allocation.*/
-    const current_allocation: CurrentAllocation = {};
-    const target_allocation_percentages: TargetAllocationPercentages = {};
+// Calculate current and target allocation
+function calculateCurrentAllocation(pies: PieData[]): [CurrentAllocation, TargetAllocationPercentages] {
+    const currentAllocation: CurrentAllocation = {};
+    const targetAllocationPercentages: TargetAllocationPercentages = {};
+    
     for (const pie of pies) {
-        const [pie_type, target_allocation] = extract_target_allocation_from_name(pie.name);
-        if (pie_type && target_allocation) {
-            current_allocation[pie_type] = (current_allocation[pie_type] || 0) + pie.totalInvested;
-            target_allocation_percentages[pie_type] = target_allocation;
+        const [pieType, targetAllocation] = extractTargetAllocationFromName(pie.name);
+        
+        if (pieType && targetAllocation !== null) {
+            currentAllocation[pieType] = (currentAllocation[pieType] || 0) + pie.totalInvested;
+            targetAllocationPercentages[pieType] = targetAllocation;
         }
     }
-    return [current_allocation, target_allocation_percentages];
+    
+    return [currentAllocation, targetAllocationPercentages];
 }
 
-function calculate_percent_allocation(current_allocation: CurrentAllocation): PercentAllocation {
-    /**Calculates percentage allocation.*/
-    const total_current_allocation = Object.values(current_allocation).reduce((sum, val) => sum + val, 0);
-    const percent_allocation: PercentAllocation = {};
-    for (const pie_type in current_allocation) {
-        percent_allocation[pie_type] = total_current_allocation ? current_allocation[pie_type] / total_current_allocation : 0;
+// Calculate percentage allocation
+function calculatePercentAllocation(currentAllocation: CurrentAllocation): PercentAllocation {
+    const totalCurrentAllocation = Object.values(currentAllocation).reduce((sum, val) => sum + val, 0);
+    const percentAllocation: PercentAllocation = {};
+    
+    for (const pieType in currentAllocation) {
+        percentAllocation[pieType] = totalCurrentAllocation > 0 ? 
+            (currentAllocation[pieType] / totalCurrentAllocation) * 100 : 0;
     }
-    return percent_allocation;
+    
+    return percentAllocation;
 }
 
-function format_allocation(allocation: CurrentAllocation | TargetAllocationPercentages, percent_allocation?: PercentAllocation, is_target: boolean = false): FormattedAllocation {
-    /**Formats allocation for display.*/
-    const formatted_allocation: FormattedAllocation = {};
+// Format allocation for display
+function formatAllocation(
+    allocation: CurrentAllocation | TargetAllocationPercentages, 
+    percentAllocation?: PercentAllocation, 
+    isTarget: boolean = false
+): FormattedAllocation {
+    const formattedAllocation: FormattedAllocation = {};
+    
     for (const key in allocation) {
         const value = allocation[key];
-        if (is_target) {
-            formatted_allocation[key] = `${(value as number / 100).toFixed(2)}%`; // Assuming target allocation is percentage already and needs formatting
-        } else if (!percent_allocation) {
-            formatted_allocation[key] = `${(value as number).toFixed(2)} BGN`;
+        
+        if (isTarget) {
+            formattedAllocation[key] = `${value.toFixed(2)}%`;
+        } else if (!percentAllocation) {
+            formattedAllocation[key] = `${value.toFixed(2)} BGN`;
         } else {
-            formatted_allocation[key] = `${(value as number).toFixed(2)} BGN [${percent_allocation[key].toFixed(2)}%]`;
+            formattedAllocation[key] = `${value.toFixed(2)} BGN [${percentAllocation[key].toFixed(2)}%]`;
         }
     }
-    return formatted_allocation;
+    
+    return formattedAllocation;
 }
 
-function calculate_allocation_differences(percent_allocation: PercentAllocation, target_allocation: TargetAllocationPercentages): AllocationDifferences {
-    /**Calculates allocation differences.*/
-    const allocation_differences: AllocationDifferences = {};
-    for (const pie_type in target_allocation) {
-        const target = target_allocation[pie_type];
-        const current = percent_allocation[pie_type] || 0; // Default to 0 if pie_type not in percent_allocation
-        allocation_differences[pie_type] = `${(target - current).toFixed(2)}%`;
+// Calculate allocation differences
+function calculateAllocationDifferences(
+    percentAllocation: PercentAllocation, 
+    targetAllocation: TargetAllocationPercentages
+): AllocationDifferences {
+    const allocationDifferences: AllocationDifferences = {};
+    
+    for (const pieType in targetAllocation) {
+        const target = targetAllocation[pieType];
+        const current = percentAllocation[pieType] || 0;
+        allocationDifferences[pieType] = `${(target - current).toFixed(2)}%`;
     }
-    return allocation_differences;
+    
+    return allocationDifferences;
 }
 
-function calculate_performance_metrics(portfolio_data: PerformanceMetrics, budget: number): AllocationAnalysis {
-    /**Calculates portfolio performance metrics and allocation analysis.*/
-    validate_portfolio_data(portfolio_data);
-    const overall_summary = extract_overall_summary(portfolio_data);
-    const pies = extract_pies(portfolio_data.portfolio || []);
+// Calculate portfolio performance metrics and allocation analysis
+function calculatePerformanceMetrics(portfolioData: PerformanceMetrics, budget: number): AllocationAnalysis | null {
+    if (!validatePortfolioData(portfolioData)) {
+        return null;
+    }
+    
+    const overallSummary = extractOverallSummary(portfolioData);
+    if (!overallSummary) {
+        return null;
+    }
+    
+    const pies = extractPies(portfolioData.portfolio);
+    
+    const [currentAllocation, targetAllocationPercentages] = calculateCurrentAllocation(pies);
+    const percentAllocation = calculatePercentAllocation(currentAllocation);
 
-    const [current_allocation, target_allocation_percentages] = calculate_current_allocation(pies);
-    const percent_allocation = calculate_percent_allocation(current_allocation);
-
-    const formatted_current_allocation = format_allocation(current_allocation, percent_allocation);
-    const formatted_target_allocation = format_allocation(target_allocation_percentages, undefined, true); // percent_allocation not needed for target, is_target=true
-    const formatted_allocation_differences = calculate_allocation_differences(percent_allocation, target_allocation_percentages);
-    const estimated_annual_dividend = calculate_estimated_annual_dividend(portfolio_data, budget);
+    const formattedCurrentAllocation = formatAllocation(currentAllocation, percentAllocation);
+    const formattedTargetAllocation = formatAllocation(targetAllocationPercentages, undefined, true);
+    const formattedAllocationDifferences = calculateAllocationDifferences(
+        percentAllocation, 
+        targetAllocationPercentages
+    );
+    
+    const estimatedAnnualDividend = calculateEstimatedAnnualDividend(portfolioData, budget);
 
     return {
-        targetAllocation: formatted_target_allocation,
-        currentAllocation: formatted_current_allocation,
-        allocationDifferences: formatted_allocation_differences,
-        estimatedAnnualDividend: estimated_annual_dividend
+        targetAllocation: formattedTargetAllocation,
+        currentAllocation: formattedCurrentAllocation,
+        allocationDifferences: formattedAllocationDifferences,
+        estimatedAnnualDividend: estimatedAnnualDividend
     };
 }
 
-function validate_investment_data(current_allocation: CurrentAllocation, target_allocation_percentages: TargetAllocationPercentages, total_investment: number): boolean {
-    /**Validates investment data.*/
-    if (typeof current_allocation !== 'object' || current_allocation === null || !Object.values(current_allocation).every(v => typeof v === 'number')) {
-        console.log("Error: Invalid current_allocation format.");
+// Validate investment data
+function validateInvestmentData(
+    currentAllocation: CurrentAllocation, 
+    targetAllocationPercentages: TargetAllocationPercentages, 
+    totalInvestment: number
+): boolean {
+    if (typeof currentAllocation !== 'object' || 
+        currentAllocation === null || 
+        !Object.values(currentAllocation).every(v => typeof v === 'number')) {
+        console.error("Invalid current_allocation format.");
         return false;
     }
-    if (typeof target_allocation_percentages !== 'object' || target_allocation_percentages === null || !Object.values(target_allocation_percentages).every(v => typeof v === 'number')) {
-        console.log("Error: Invalid target_allocation_percentages format.");
+    
+    if (typeof targetAllocationPercentages !== 'object' || 
+        targetAllocationPercentages === null || 
+        !Object.values(targetAllocationPercentages).every(v => typeof v === 'number')) {
+        console.error("Invalid target_allocation_percentages format.");
         return false;
     }
-    if (typeof total_investment !== 'number' || total_investment <= 0) {
-        console.log("Error: Invalid total_investment format.");
+    
+    if (typeof totalInvestment !== 'number' || totalInvestment <= 0) {
+        console.error("Invalid total_investment format.");
         return false;
     }
-    if (Object.keys(current_allocation).sort().toString() !== Object.keys(target_allocation_percentages).sort().toString()) {
-        console.log("Error: Allocation keys mismatch.");
+    
+    // Check if allocation keys match
+    const currentKeys = Object.keys(currentAllocation).sort();
+    const targetKeys = Object.keys(targetAllocationPercentages).sort();
+    
+    if (currentKeys.join(',') !== targetKeys.join(',')) {
+        console.error("Allocation keys mismatch.");
+        console.error(`Current keys: ${currentKeys.join(', ')}`);
+        console.error(`Target keys: ${targetKeys.join(', ')}`);
         return false;
     }
+    
     return true;
 }
 
-function calculate_target_investments(current_allocation: CurrentAllocation, target_allocation_percentages: TargetAllocationPercentages, total_investment: number): TargetInvestments | null {
-    /**Calculates target investment amounts.*/
-    if (!validate_investment_data(current_allocation, target_allocation_percentages, total_investment)) {
+// Calculate target investment amounts
+function calculateTargetInvestments(
+    currentAllocation: CurrentAllocation, 
+    targetAllocationPercentages: TargetAllocationPercentages, 
+    totalInvestment: number
+): TargetInvestments | null {
+    if (!validateInvestmentData(currentAllocation, targetAllocationPercentages, totalInvestment)) {
         return null;
     }
 
-    const new_total = Object.values(current_allocation).reduce((sum, val) => sum + val, 0) + total_investment;
-    const target_investments: TargetInvestments = {};
-    for (const pie_type in target_allocation_percentages) {
-        const target_percentage = target_allocation_percentages[pie_type] / 100; // target_percentage was in percentage, convert to ratio
-        target_investments[pie_type] = Math.max(0, new_total * target_percentage - (current_allocation[pie_type] || 0));
+    const newTotal = Object.values(currentAllocation).reduce((sum, val) => sum + val, 0) + totalInvestment;
+    const targetInvestments: TargetInvestments = {};
+    
+    for (const pieType in targetAllocationPercentages) {
+        const targetPercentage = targetAllocationPercentages[pieType] / 100;
+        const targetValue = newTotal * targetPercentage;
+        const currentValue = currentAllocation[pieType] || 0;
+        
+        // Calculate how much to invest in this pie
+        targetInvestments[pieType] = Math.max(0, targetValue - currentValue);
     }
-    return target_investments;
+    
+    return targetInvestments;
 }
 
-function calculate_current_target_investments(portfolio_data: PerformanceMetrics, total_investment: number): TargetInvestments | null {
-    /**Calculates current target investments.*/
+// Calculate current target investments
+function calculateCurrentTargetInvestments(
+    portfolioData: PerformanceMetrics, 
+    totalInvestment: number
+): TargetInvestments | null {
     try {
-        validate_portfolio_data(portfolio_data);
-        const pies = extract_pies(portfolio_data.portfolio || []);
-        const [current_allocation, target_allocation_percentages] = calculate_current_allocation(pies);
+        if (!validatePortfolioData(portfolioData)) {
+            return null;
+        }
+        
+        const pies = extractPies(portfolioData.portfolio);
+        const [currentAllocation, targetAllocationPercentages] = calculateCurrentAllocation(pies);
 
-        if (!validate_investment_data(current_allocation, target_allocation_percentages, total_investment)) {
+        if (!validateInvestmentData(currentAllocation, targetAllocationPercentages, totalInvestment)) {
             return null;
         }
 
-        return calculate_target_investments(current_allocation, target_allocation_percentages, total_investment);
-
-    } catch (ve: any) {
-        console.error(`ValueError: ${ve.message}`); // ve is already caught as any, message is safe to access
+        return calculateTargetInvestments(currentAllocation, targetAllocationPercentages, totalInvestment);
+    } catch (error: any) {
+        console.error(`Error calculating target investments: ${error.message}`);
         return null;
     }
 }
 
+// Main function to fetch portfolio data
 export async function fetchPortfolioData(budget: number = 1000, cc: string = "BG"): Promise<PerformanceMetrics> {
-    let all_pies_data: PieData| null = null;
-    let overall_summary: OverallSummary | null = null;
-    let performanceMetrics: AllocationAnalysis | null = null; // Define performanceMetrics here
-    let targetInvestments: TargetInvestments | null = null; // Define targetInvestments here
-
+    // Initialize default performance metrics
+    const defaultPerformanceMetrics: PerformanceMetrics = {
+        portfolio: null,
+        overallSummary: null,
+        allocationAnalysis: undefined,
+        rebalanceInvestmentForTarget: null,
+        freeCashAvailable: 0,
+        fetchDate: format(new Date(), "yyyy-MM-dd HH:mm:ss")
+    };
+    
+    // Fetch cash data
     const cashResponse = await exponentialBackoffRequest(cashURL, 'GET', headers, 5);
-    if (cashResponse === null) {
-        console.log("Failed to fetch cash data.");
-        return [null, null];
+    if (!cashResponse) {
+        console.error("Failed to fetch cash data.");
+        return defaultPerformanceMetrics;
     }
 
-    const allInstrumentsMetadata = await getAllInstrumentsMetadata();
-    if (allInstrumentsMetadata) {
-        [all_pies_data, overall_summary] = await getAllPiesData(allInstrumentsMetadata);
-        if (all_pies_data && overall_summary) {
-            const now = new Date();
-            const dt_string = format(now, "yyyy-MM-dd HH:mm:ss");
-            if (all_pies_data) {
-                all_pies_data.forEach(pie => {
-                    pie['fetchDate'] = dt_string;
-                });
-            }
-            overall_summary.overallSummary.fetchDate = dt_string; // Assuming fetchDate should be under overallSummary.overallSummary
-        }
-    }
-
-    const cashData = cashResponse.data as any; // Cast to anyas the response is an array
+    // Calculate free cash
     let totalFreeCash = 0;
+    const cashData = cashResponse.data;
+    
     if (Array.isArray(cashData)) {
         for (const cashEntry of cashData) {
-            totalFreeCash += cashEntry.cash || 0; // Sum up cash from each entry, default to 0 if cash is missing
+            totalFreeCash += cashEntry.cash || 0;
         }
-    } else {
-        totalFreeCash += cashData.free;
+    } else if (cashData && typeof cashData === 'object') {
+        totalFreeCash = cashData.free || 0;
+    }
+    
+    defaultPerformanceMetrics.freeCashAvailable = totalFreeCash;
+    
+    // Fetch instruments metadata
+    const allInstrumentsMetadata = await getAllInstrumentsMetadata();
+    if (!allInstrumentsMetadata) {
+        console.error("Failed to fetch instruments metadata.");
+        return defaultPerformanceMetrics;
+    }
+    
+    // Fetch all pies data
+    const [allPiesData, overallSummary] = await getAllPiesData(allInstrumentsMetadata);
+    
+    // Initialize performance metrics
+    const portfolioData: PerformanceMetrics = {
+        ...defaultPerformanceMetrics,
+        portfolio: allPiesData,
+        overallSummary: overallSummary
+    };
+    
+    // Update fetch date for all pies
+    const dtString = format(new Date(), "yyyy-MM-dd HH:mm:ss");
+    if (allPiesData) {
+        allPiesData.forEach(pie => {
+            pie.fetchDate = dtString;
+        });
+    }
+    
+    if (overallSummary) {
+        overallSummary.overallSummary.fetchDate = dtString;
     }
 
-    const portfolio_data: PerformanceMetrics = { // Ensure portfolio_data is of type PerformanceMetrics
-        portfolio: all_pies_data,
-        overallSummary: overall_summary,
-        allocationAnalysis:  {} as AllocationAnalysis, // Initialize as empty object to avoid potential undefined errors
-        rebalanceInvestmentForTarget: null,
-        freeCashAvailable: totalFreeCash,
-        fetchDate: format(new Date(), "yyyy-MM-dd HH:mm:ss")
-    } as PerformanceMetrics; // Type assertion to ensure the structure
+    // Calculate performance metrics and target investments if we have data
+    if (portfolioData.portfolio && portfolioData.overallSummary) {
+        const performanceMetrics = calculatePerformanceMetrics(portfolioData, budget);
+        portfolioData.allocationAnalysis = performanceMetrics;
 
-
-    if (portfolio_data.portfolio && portfolio_data.overallSummary) { // Check if portfolio and overallSummary are not null/undefined
-        performanceMetrics = calculate_performance_metrics(portfolio_data, budget);
-        portfolio_data.allocationAnalysis = performanceMetrics;
-
-        targetInvestments = calculate_current_target_investments(portfolio_data, budget);
-        portfolio_data.rebalanceInvestmentForTarget = targetInvestments;
+        const targetInvestments = calculateCurrentTargetInvestments(portfolioData, budget);
+        portfolioData.rebalanceInvestmentForTarget = targetInvestments;
     }
 
-
-    return portfolio_data;
+    return portfolioData;
 }
