@@ -1,5 +1,33 @@
 export type Theme = 'light' | 'dark' | 'system';
 
+// Get theme from request cookie
+export function getTheme(request: Request): Theme {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies = parseCookies(cookieHeader);
+  return (cookies["theme"] as Theme) || "light";
+}
+
+// Set theme in cookie
+export function setTheme(theme: Theme): string {
+  return `theme=${theme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+
+// Helper function to parse cookies
+function parseCookies(cookieHeader: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  
+  if (!cookieHeader) return cookies;
+  
+  cookieHeader.split(';').forEach(cookie => {
+    const [name, value] = cookie.trim().split('=');
+    if (name && value) {
+      cookies[name] = decodeURIComponent(value);
+    }
+  });
+  
+  return cookies;
+}
+
 export function getThemeClass(theme: Theme): string {
   if (theme === 'dark') return 'dark';
   if (theme === 'light') return 'light';

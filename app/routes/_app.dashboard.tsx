@@ -55,7 +55,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       user,
       upcomingTasks,
       portfolioData,
-    });
+    }, { headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' } });
   } catch (error) {
     return errorResponse(error);
   }

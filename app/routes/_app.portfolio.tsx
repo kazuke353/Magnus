@@ -43,7 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       throw createApiError("Failed to load portfolio data", { originalError: loadError });
     }
 
-    return json({ user, portfolioData });
+    return json({ user, portfolioData }, { headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' } });
   } catch (error) {
     return errorResponse(error);
   }
