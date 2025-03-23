@@ -37,7 +37,8 @@ authenticator.use(
 // authenticator.isAuthenticated is not a function, since the last updates to remix! This is why we have this function!
 export async function isAuthenticated(request: Request): Promise<User | null> {
   try {
-    return await getSessionUser(request);
+    const user = await getSessionUser(request);
+    return user;
   } catch (error) {
     console.error("Authentication error:", error);
     return null;
@@ -46,13 +47,19 @@ export async function isAuthenticated(request: Request): Promise<User | null> {
 
 export async function requireAuthentication(request: Request, failureRedirect: string = "/login") {
   const user = await isAuthenticated(request);
+  
   if (!user) {
-    const currentPath = new URL(request.url).pathname;
+    // Get the current path to redirect back after login
+    const url = new URL(request.url);
+    const currentPath = url.pathname;
+    
+    // Only add redirectTo if not already on the login page
     if (currentPath !== failureRedirect) {
-      throw redirect(`${failureRedirect}?redirectTo=${currentPath}`);
+      throw redirect(`${failureRedirect}?redirectTo=${encodeURIComponent(currentPath)}`);
     }
-    return null; // Handle case where already on login page
+    throw redirect(failureRedirect);
   }
+  
   return user;
 }
 

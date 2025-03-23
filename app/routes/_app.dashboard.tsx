@@ -20,21 +20,45 @@ import { useNavigation } from "@remix-run/react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
+    // This will redirect to login if not authenticated
     const user = await requireAuthentication(request, "/login");
+    
+    if (!user) {
+      // This should not happen due to requireAuthentication, but just in case
+      return json({
+        error: "Authentication required",
+        user: null,
+        upcomingTasks: [],
+        goals: [],
+        portfolioData: null,
+      });
+    }
 
     // Get upcoming tasks
-    const tasks = await getUserTasks(user.id);
-    const upcomingTasks = tasks
-      .filter(task => !task.completed && task.dueDate)
-      .sort((a, b) => {
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      })
-      .slice(0, 5);
+    let upcomingTasks: Task[] = [];
+    try {
+      const tasks = await getUserTasks(user.id);
+      upcomingTasks = tasks
+        .filter(task => !task.completed && task.dueDate)
+        .sort((a, b) => {
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        })
+        .slice(0, 5);
+    } catch (taskError) {
+      console.error("Error fetching tasks:", taskError);
+      // Continue with empty tasks
+    }
 
-    // Get user's goals
-    const goals = await getUserGoals(user.id);
+    // Get user's goals - with error handling
+    let goals: Goal[] = [];
+    try {
+      goals = await getUserGoals(user.id);
+    } catch (goalError) {
+      console.error("Error fetching goals:", goalError);
+      // Continue with empty goals
+    }
     
     // Get portfolio data
     let portfolioData: PerformanceMetrics | null = null;
@@ -55,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     } catch (loadError) {
       console.error("Error loading portfolio data in loader:", loadError);
-      throw createApiError("Failed to load portfolio data", { originalError: loadError });
+      // Continue with null portfolio data
     }
 
     return json({
