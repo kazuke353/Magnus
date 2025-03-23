@@ -8,14 +8,28 @@ import Card from "~/components/Card";
 import SummaryCard from "~/components/SummaryCard";
 import Button from "~/components/Button";
 import PortfolioChart from "~/components/PortfolioChart";
+import PortfolioValueChart from "~/components/PortfolioValueChart";
+import PerformanceComparisonChart from "~/components/PerformanceComparisonChart";
 import LoadingIndicator from "~/components/LoadingIndicator";
 import PortfolioSkeleton from "~/components/PortfolioSkeleton";
 import SortableTable from "~/components/SortableTable";
 import { showToast } from "~/components/ToastContainer";
 import ImportExportModal from "~/components/ImportExportModal";
+import RebalanceModal from "~/components/RebalanceModal";
 import { FiRefreshCw, FiTrendingUp, FiTrendingDown, FiDollarSign, FiCalendar, FiMessageSquare, FiBarChart, FiList, FiPieChart, FiUpload, FiDownload } from "react-icons/fi";
 import { formatDate, formatDateTime, formatCurrency, formatPercentage } from "~/utils/formatters";
 import { errorResponse, createApiError } from "~/utils/error-handler";
+
+// Define interfaces for historical data
+interface HistoricalValue {
+  date: string;
+  value: number;
+}
+
+interface Benchmark {
+  name: string;
+  returnPercentage: number;
+}
 
 // Loader function to fetch user and initial portfolio data
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -31,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       if (cachedData) {
         portfolioData = cachedData;
       } else {
-        // If no cached data, fetch fresh data
+        // Force fresh data fetch
         portfolioData = await getPortfolioData(user.settings.monthlyBudget, user.settings.country);
 
         if (portfolioData) {
@@ -43,7 +57,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       throw createApiError("Failed to load portfolio data", { originalError: loadError });
     }
 
-    return json({ user, portfolioData }, { headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' } });
+    // In a real implementation, you would load these from a database
+    // For now, we'll use mock data
+    const historicalValues: HistoricalValue[] = [
+      { date: '2023-01-01', value: 10000 },
+      { date: '2023-02-01', value: 10200 },
+      { date: '2023-03-01', value: 10150 },
+      { date: '2023-04-01', value: 10400 },
+      { date: '2023-05-01', value: 10600 },
+      { date: '2023-06-01', value: 10550 },
+    ];
+
+    const benchmarks: Benchmark[] = [
+      { name: 'S&P 500', returnPercentage: 8.5 },
+      { name: 'MSCI World', returnPercentage: 7.2 },
+    ];
+
+    return json({ 
+      user, 
+      portfolioData,
+      historicalValues,
+      benchmarks
+    }, { headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' } });
   } catch (error) {
     return errorResponse(error);
   }
@@ -103,6 +138,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: "Error importing pie data: " + (error instanceof Error ? error.message : "Unknown error")
         }, { status: 500 });
       }
+    } else if (actionType === "saveHistoricalData") {
+      try {
+        const historicalDataJson = formData.get("historicalData") as string;
+        if (!historicalDataJson) {
+          throw new Error("No historical data provided");
+        }
+
+        const historicalData = JSON.parse(historicalDataJson);
+        
+        // In a real implementation, you would save this to a database
+        // For now, we'll just return success
+        return json({ 
+          success: true, 
+          message: `Successfully saved ${historicalData.length} historical data points` 
+        });
+      } catch (error) {
+        console.error("Error saving historical data:", error);
+        return json({
+          success: false,
+          error: "Error saving historical data: " + (error instanceof Error ? error.message : "Unknown error")
+        }, { status: 500 });
+      }
+    } else if (actionType === "saveBenchmarks") {
+      try {
+        const benchmarksJson = formData.get("benchmarks") as string;
+        if (!benchmarksJson) {
+          throw new Error("No benchmarks provided");
+        }
+
+        const benchmarks = JSON.parse(benchmarksJson);
+        
+        // In a real implementation, you would save this to a database
+        // For now, we'll just return success
+        return json({ 
+          success: true, 
+          message: `Successfully saved ${benchmarks.length} benchmarks` 
+        });
+      } catch (error) {
+        console.error("Error saving benchmarks:", error);
+        return json({
+          success: false,
+          error: "Error saving benchmarks: " + (error instanceof Error ? error.message : "Unknown error")
+        }, { status: 500 });
+      }
     }
 
     return json({ error: "Invalid action" }, { status: 400 });
@@ -117,12 +196,15 @@ export default function Portfolio() {
   const submit = useSubmit();
 
   // Handle potential error in loader data
-  const { user, portfolioData: initialPortfolioData, error } = loaderData.error
-    ? { user: null, portfolioData: null, error: loaderData.error }
+  const { user, portfolioData: initialPortfolioData, historicalValues, benchmarks, error } = loaderData.error
+    ? { user: null, portfolioData: null, historicalValues: [], benchmarks: [], error: loaderData.error }
     : { ...loaderData, error: null };
 
   const [portfolioData, setPortfolioData] = useState<PerformanceMetrics | null>(initialPortfolioData);
   const [isImportExportModalOpen, setIsImportExportModalOpen] = useState(false);
+  const [isRebalanceModalOpen, setIsRebalanceModalOpen] = useState(false);
+  const [localHistoricalValues, setLocalHistoricalValues] = useState<HistoricalValue[]>(historicalValues || []);
+  const [localBenchmarks, setLocalBenchmarks] = useState<Benchmark[]>(benchmarks || []);
 
   // Update portfolio data when loader data changes
   useEffect(() => {
@@ -166,6 +248,36 @@ export default function Portfolio() {
       type: "info",
       message: "Importing pie data...",
       duration: 3000
+    });
+  }, [submit]);
+
+  const handleSaveHistoricalData = useCallback((data: HistoricalValue[]) => {
+    setLocalHistoricalValues(data);
+    
+    const formData = new FormData();
+    formData.append("_action", "saveHistoricalData");
+    formData.append("historicalData", JSON.stringify(data));
+    submit(formData, { method: "post" });
+    
+    showToast({
+      type: "info",
+      message: "Saving historical data...",
+      duration: 2000
+    });
+  }, [submit]);
+
+  const handleSaveBenchmarks = useCallback((data: Benchmark[]) => {
+    setLocalBenchmarks(data);
+    
+    const formData = new FormData();
+    formData.append("_action", "saveBenchmarks");
+    formData.append("benchmarks", JSON.stringify(data));
+    submit(formData, { method: "post" });
+    
+    showToast({
+      type: "info",
+      message: "Saving benchmarks...",
+      duration: 2000
     });
   }, [submit]);
 
@@ -214,6 +326,36 @@ export default function Portfolio() {
     }
   }, [navigation.state, navigation.formData]);
 
+  // Handle successful historical data save
+  useEffect(() => {
+    if (navigation.state === "idle" && navigation.formData?.get("_action") === "saveHistoricalData") {
+      const actionData = navigation.formData;
+
+      if (actionData && "success" in actionData && actionData.success) {
+        showToast({
+          type: "success",
+          message: "Historical data saved successfully",
+          duration: 3000
+        });
+      }
+    }
+  }, [navigation.state, navigation.formData]);
+
+  // Handle successful benchmarks save
+  useEffect(() => {
+    if (navigation.state === "idle" && navigation.formData?.get("_action") === "saveBenchmarks") {
+      const actionData = navigation.formData;
+
+      if (actionData && "success" in actionData && actionData.success) {
+        showToast({
+          type: "success",
+          message: "Benchmarks saved successfully",
+          duration: 3000
+        });
+      }
+    }
+  }, [navigation.state, navigation.formData]);
+
   // Memoize the portfolio summary data
   const portfolioSummary = useMemo(() => {
     if (!portfolioData || !portfolioData.overallSummary || !portfolioData.overallSummary.overallSummary) {
@@ -227,6 +369,16 @@ export default function Portfolio() {
       fetchDate: portfolioData.overallSummary.overallSummary.fetchDate || new Date().toISOString(),
       estimatedAnnualDividend: portfolioData.allocationAnalysis?.estimatedAnnualDividend || 0
     };
+  }, [portfolioData]);
+
+  // Extract portfolio performances for comparison chart
+  const portfolioPerformances = useMemo(() => {
+    if (!portfolioData?.portfolio) return [];
+    
+    return portfolioData.portfolio.map(pie => ({
+      name: pie.name,
+      returnPercentage: pie.returnPercentage
+    }));
   }, [portfolioData]);
 
   if (!user) {
@@ -384,9 +536,12 @@ export default function Portfolio() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Portfolio Performance</h2>
-              <div className="h-80">
-                <PortfolioChart portfolioData={portfolioData} />
-              </div>
+              <PortfolioChart 
+                portfolioData={portfolioData} 
+                currency={user.settings.currency}
+                showRebalanceButton={true}
+                onRebalanceClick={() => setIsRebalanceModalOpen(true)}
+              />
             </Card>
 
             <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
@@ -431,10 +586,36 @@ export default function Portfolio() {
                         ))}
                       </div>
                     </div>
+
+                    <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                      <Button 
+                        onClick={() => setIsRebalanceModalOpen(true)}
+                        className="w-full"
+                      >
+                        <FiRefreshCw className="mr-2" />
+                        Rebalance Portfolio
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>
             </Card>
+          </div>
+
+          {/* Portfolio Value Trend and Performance Comparison */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PortfolioValueChart 
+              currentValue={portfolioSummary.totalInvested + portfolioSummary.totalResult}
+              currency={user.settings.currency}
+              initialHistoricalData={localHistoricalValues}
+              onSaveHistoricalData={handleSaveHistoricalData}
+            />
+            
+            <PerformanceComparisonChart 
+              portfolioPerformances={portfolioPerformances}
+              initialBenchmarks={localBenchmarks}
+              onSaveBenchmarks={handleSaveBenchmarks}
+            />
           </div>
 
           {/* Portfolio Breakdown Section */}
@@ -623,6 +804,15 @@ export default function Portfolio() {
           onImport={handleImportPie}
           portfolioData={portfolioData}
           isImporting={isImporting}
+        />
+      )}
+
+      {/* Rebalance Modal */}
+      {isRebalanceModalOpen && portfolioData && (
+        <RebalanceModal
+          portfolioData={portfolioData}
+          onClose={() => setIsRebalanceModalOpen(false)}
+          currency={user.settings.currency}
         />
       )}
     </div>
