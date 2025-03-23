@@ -19,21 +19,33 @@ export interface Goal {
 
 export async function getUserGoals(userId: string): Promise<Goal[]> {
   try {
+    // Check if db and goals are properly initialized
+    if (!db || !goals) {
+      console.error('Database or goals schema not properly initialized');
+      return [];
+    }
+    
     const userGoals = await db.select().from(goals).where(eq(goals.userId, userId));
     return userGoals;
   } catch (error) {
     console.error('Error fetching user goals:', error);
-    throw new Error('Failed to fetch user goals');
+    // Return empty array instead of throwing to prevent cascading errors
+    return [];
   }
 }
 
 export async function getGoalById(goalId: string): Promise<Goal | null> {
   try {
+    if (!db || !goals) {
+      console.error('Database or goals schema not properly initialized');
+      return null;
+    }
+    
     const [goal] = await db.select().from(goals).where(eq(goals.id, goalId));
     return goal || null;
   } catch (error) {
     console.error('Error fetching goal by ID:', error);
-    throw new Error('Failed to fetch goal');
+    return null;
   }
 }
 
@@ -50,6 +62,10 @@ export async function createGoal(
   }
 ): Promise<Goal> {
   try {
+    if (!db || !goals) {
+      throw new Error('Database or goals schema not properly initialized');
+    }
+    
     const now = new Date().toISOString();
     const newGoal = {
       id: uuidv4(),
@@ -81,6 +97,10 @@ export async function updateGoal(
   }>
 ): Promise<Goal | null> {
   try {
+    if (!db || !goals) {
+      throw new Error('Database or goals schema not properly initialized');
+    }
+    
     const now = new Date().toISOString();
     
     await db.update(goals)
@@ -93,18 +113,22 @@ export async function updateGoal(
     return getGoalById(goalId);
   } catch (error) {
     console.error('Error updating goal:', error);
-    throw new Error('Failed to update goal');
+    return null;
   }
 }
 
 export async function deleteGoal(goalId: string, userId: string): Promise<boolean> {
   try {
+    if (!db || !goals) {
+      throw new Error('Database or goals schema not properly initialized');
+    }
+    
     await db.delete(goals)
       .where(eq(goals.id, goalId) && eq(goals.userId, userId));
     
     return true;
   } catch (error) {
     console.error('Error deleting goal:', error);
-    throw new Error('Failed to delete goal');
+    return false;
   }
 }

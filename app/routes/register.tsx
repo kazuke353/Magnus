@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Form, Link, useActionData, useNavigation } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { isAuthenticated, commitSession } from "~/services/auth.server";
+import { isAuthenticated } from "~/services/auth.server";
 import { createUser, getUserByEmail } from "~/db/user.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 import { z } from "zod";
+import { setUserSession } from "~/services/session.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await isAuthenticated(request);
@@ -50,11 +51,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // 3. Create user in database
     const user = await createUser(email, password, firstName, lastName);
-    const session = await commitSession(request, user)
+    
+    // 4. Set user session
+    const sessionCookie = await setUserSession(request, user.id);
 
-    // 4. Redirect to dashboard after successful registration
+    // 5. Redirect to dashboard after successful registration with session cookie
     return redirect("/dashboard", {
-      headers: { "Set-Cookie": session },
+      headers: { 
+        "Set-Cookie": sessionCookie 
+      },
     });
 
   } catch (error) {
