@@ -1,14 +1,34 @@
 import { Outlet, Link, useLocation, NavLink } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { FiHome, FiDollarSign, FiMessageSquare, FiCalendar, FiSettings, FiTarget, FiMenu, FiX } from "react-icons/fi";
-import Layout from "~/components/Layout";
 import { ToastContainer } from "~/components/ToastContainer";
-import { useTheme } from "~/utils/theme";
 
 export default function AppLayout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { theme } = useTheme();
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+
+  // Initialize theme from localStorage on client side
+  useEffect(() => {
+    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
+    if (storedTheme) {
+      setTheme(storedTheme);
+    } else {
+      // Default to system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
+    }
+    
+    // Apply theme class
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(
+      storedTheme === 'dark' || 
+      (storedTheme === 'system' && prefersDark) || 
+      (!storedTheme && prefersDark) 
+        ? 'dark' 
+        : 'light'
+    );
+  }, []);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -25,7 +45,7 @@ export default function AppLayout() {
   ];
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       {/* Mobile menu button */}
       <div className="fixed top-4 left-4 z-50 md:hidden">
         <button
@@ -169,6 +189,6 @@ export default function AppLayout() {
 
       {/* Toast container for notifications */}
       <ToastContainer />
-    </Layout>
+    </div>
   );
 }
