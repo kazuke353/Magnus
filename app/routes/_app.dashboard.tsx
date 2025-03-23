@@ -4,14 +4,16 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
 import { getUserTasks, Task } from "~/db/tasks.server";
+import { getUserGoals, Goal } from "~/db/goals.server";
 import { getPortfolioData, savePortfolioData } from "~/services/portfolio.server";
 import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
 import Card from "~/components/Card";
 import DashboardSkeleton from "~/components/DashboardSkeleton";
 import PortfolioSummary from "~/components/PortfolioSummary";
+import GoalTracker from "~/components/GoalTracker";
 import ChatPromo from "~/components/ChatPromo";
 import { showToast } from "~/components/ToastContainer";
-import { FiCalendar, FiDollarSign } from "react-icons/fi";
+import { FiCalendar, FiDollarSign, FiTarget } from "react-icons/fi";
 import { formatDate } from "~/utils/date";
 import { errorResponse, createApiError } from "~/utils/error-handler";
 import { useNavigation } from "@remix-run/react";
@@ -31,6 +33,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       })
       .slice(0, 5);
 
+    // Get user's goals
+    const goals = await getUserGoals(user.id);
+    
     // Get portfolio data
     let portfolioData: PerformanceMetrics | null = null;
     
@@ -56,6 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return json({
       user,
       upcomingTasks,
+      goals,
       portfolioData,
     }, { headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' } });
   } catch (error) {
@@ -66,6 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 interface DashboardLoaderData {
   user: Awaited<ReturnType<typeof requireAuthentication>>;
   upcomingTasks: Task[];
+  goals: Goal[];
   portfolioData: PerformanceMetrics | null;
   error?: any;
 }
@@ -75,8 +82,8 @@ export default function Dashboard() {
   const navigation = useNavigation();
   
   // Handle potential error in loader data
-  const { user, upcomingTasks, portfolioData, error } = loaderData.error
-    ? { ...loaderData, user: null, upcomingTasks: [], portfolioData: null, error: loaderData.error }
+  const { user, upcomingTasks, goals, portfolioData, error } = loaderData.error
+    ? { ...loaderData, user: null, upcomingTasks: [], goals: [], portfolioData: null, error: loaderData.error }
     : { ...loaderData, error: null };
 
   // Show notification when there's an error
@@ -109,6 +116,12 @@ export default function Dashboard() {
       estimatedAnnualDividend: portfolioData.allocationAnalysis?.estimatedAnnualDividend || 0
     };
   }, [portfolioData]);
+
+  // Calculate current portfolio value
+  const currentPortfolioValue = useMemo(() => {
+    if (!portfolioSummaryData) return 0;
+    return portfolioSummaryData.totalInvested + portfolioSummaryData.totalResult;
+  }, [portfolioSummaryData]);
 
   if (!user) {
     return (
@@ -151,6 +164,28 @@ export default function Dashboard() {
           currency={user.settings.currency}
           compact={true}
         />
+      )}
+
+      {/* Financial Goals Section */}
+      {goals.length > 0 && (
+        <div className="mb-6">
+          <GoalTracker
+            goals={goals.slice(0, 1)} // Show only the first goal on dashboard
+            currentPortfolioValue={currentPortfolioValue}
+            currency={user.settings.currency}
+            className="mb-2"
+          />
+          {goals.length > 1 && (
+            <div className="text-right">
+              <Link
+                to="/goals"
+                className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                View all {goals.length} goals →
+              </Link>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Main content */}
