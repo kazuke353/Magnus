@@ -5,19 +5,17 @@ import { requireAuthentication } from "~/services/auth.server";
 import { getPortfolioData, savePortfolioData } from "~/services/portfolio.server";
 import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
 import Card from "~/components/Card";
-import SummaryCard from "~/components/SummaryCard";
-import Button from "~/components/Button";
-import PortfolioChart from "~/components/PortfolioChart";
-import PortfolioValueChart from "~/components/PortfolioValueChart";
-import PerformanceComparisonChart from "~/components/PerformanceComparisonChart";
+import PortfolioSummary from "~/components/PortfolioSummary";
+import PortfolioHeader from "~/components/PortfolioHeader";
+import PortfolioVisualizations from "~/components/PortfolioVisualizations";
+import PortfolioBreakdown from "~/components/PortfolioBreakdown";
+import ChatPromo from "~/components/ChatPromo";
 import LoadingIndicator from "~/components/LoadingIndicator";
 import PortfolioSkeleton from "~/components/PortfolioSkeleton";
-import SortableTable from "~/components/SortableTable";
+import EmptyPortfolioState from "~/components/EmptyPortfolioState";
 import { showToast } from "~/components/ToastContainer";
 import ImportExportModal from "~/components/ImportExportModal";
 import RebalanceModal from "~/components/RebalanceModal";
-import { FiRefreshCw, FiTrendingUp, FiTrendingDown, FiDollarSign, FiCalendar, FiMessageSquare, FiBarChart, FiList, FiPieChart, FiUpload, FiDownload } from "react-icons/fi";
-import { formatDate, formatDateTime, formatCurrency, formatPercentage } from "~/utils/formatters";
 import { errorResponse, createApiError } from "~/utils/error-handler";
 
 // Define interfaces for historical data
@@ -371,16 +369,6 @@ export default function Portfolio() {
     };
   }, [portfolioData]);
 
-  // Extract portfolio performances for comparison chart
-  const portfolioPerformances = useMemo(() => {
-    if (!portfolioData?.portfolio) return [];
-    
-    return portfolioData.portfolio.map(pie => ({
-      name: pie.name,
-      returnPercentage: pie.returnPercentage
-    }));
-  }, [portfolioData]);
-
   if (!user) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -413,387 +401,48 @@ export default function Portfolio() {
     <div className="space-y-8 px-4 md:px-8 lg:px-16 xl:px-24">
       {isRefreshing && <LoadingIndicator fullScreen message="Refreshing portfolio data..." />}
 
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Investment Portfolio
-          </h1>
-          <p className="text-lg text-gray-700 dark:text-gray-300">
-            Detailed view of your portfolio performance and holdings.
-          </p>
-        </div>
-
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsImportExportModalOpen(true)}
-            className="px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            <FiUpload className="mr-2" />
-            Import/Export
-          </Button>
-          
-          <Button
-            onClick={handleRefresh}
-            isLoading={isRefreshing}
-            className="px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200"
-            disabled={isRefreshing}
-          >
-            <FiRefreshCw className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
-        </div>
-      </div>
+      <PortfolioHeader 
+        onRefresh={handleRefresh}
+        onImportExport={() => setIsImportExportModalOpen(true)}
+        isRefreshing={isRefreshing}
+      />
 
       {!portfolioData && !isRefreshing && (
-        <Card>
-          <div className="text-center py-8">
-            <FiBarChart className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Portfolio Data Available</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              We couldn't find any portfolio data for your account.
-            </p>
-            <Button onClick={handleRefresh}>
-              <FiRefreshCw className="mr-2" />
-              Refresh Data
-            </Button>
-          </div>
-        </Card>
+        <EmptyPortfolioState onRefresh={handleRefresh} />
       )}
 
       {portfolioData && portfolioSummary && portfolioData.allocationAnalysis && portfolioData.portfolio && (
         <>
-          {/* Overall Portfolio Summary Panel - Single Card */}
-          <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Invested */}
-              <div className="p-4">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-800 mr-4">
-                    <FiDollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">INVESTED</h3>
-                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      {formatCurrency(portfolioSummary.totalInvested, user.settings.currency)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Overall Portfolio Summary */}
+          <PortfolioSummary
+            totalInvested={portfolioSummary.totalInvested}
+            totalResult={portfolioSummary.totalResult}
+            returnPercentage={portfolioSummary.returnPercentage}
+            fetchDate={portfolioSummary.fetchDate}
+            estimatedAnnualDividend={portfolioSummary.estimatedAnnualDividend}
+            currency={user.settings.currency}
+          />
 
-              {/* Return */}
-              <div className="p-4">
-                <div className="flex items-center">
-                  <div className={`p-3 rounded-full ${portfolioSummary.totalResult >= 0 ? 'bg-green-100 dark:bg-green-800' : 'bg-red-100 dark:bg-red-800'} mr-4`}>
-                    {portfolioSummary.totalResult >= 0 ? (
-                      <FiTrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <FiTrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">RETURN</h3>
-                    <p className={`text-xl font-bold ${portfolioSummary.totalResult >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} mt-1`}>
-                      {formatCurrency(portfolioSummary.totalResult, user.settings.currency, true)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Portfolio Visualizations */}
+          <PortfolioVisualizations
+            portfolioData={portfolioData}
+            currency={user.settings.currency}
+            currentValue={portfolioSummary.totalInvested + portfolioSummary.totalResult}
+            historicalValues={localHistoricalValues}
+            benchmarks={localBenchmarks}
+            onRebalanceClick={() => setIsRebalanceModalOpen(true)}
+            onSaveHistoricalData={handleSaveHistoricalData}
+            onSaveBenchmarks={handleSaveBenchmarks}
+          />
 
-              {/* Est. Annual Dividends */}
-              <div className="p-4">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-teal-100 dark:bg-teal-800 mr-4">
-                    <FiDollarSign className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">EST. ANNUAL DIVIDENDS</h3>
-                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      {formatCurrency(portfolioSummary.estimatedAnnualDividend, user.settings.currency)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Last Updated */}
-              <div className="p-4">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-700 mr-4">
-                    <FiCalendar className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">LAST UPDATED</h3>
-                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1" title={portfolioSummary.fetchDate}>
-                      {formatDateTime(portfolioSummary.fetchDate)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Portfolio Allocation Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Portfolio Performance</h2>
-              <PortfolioChart 
-                portfolioData={portfolioData} 
-                currency={user.settings.currency}
-                showRebalanceButton={true}
-                onRebalanceClick={() => setIsRebalanceModalOpen(true)}
-              />
-            </Card>
-
-            <Card className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Allocation Analysis</h2>
-              <div className="space-y-4">
-                {portfolioData.allocationAnalysis && (
-                  <>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Target Allocation</h3>
-                      <div className="space-y-2">
-                        {Object.entries(portfolioData.allocationAnalysis.targetAllocation).map(([key, value]) => (
-                          <div key={key} className="flex justify-between items-center">
-                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Current Allocation</h3>
-                      <div className="space-y-2">
-                        {Object.entries(portfolioData.allocationAnalysis.currentAllocation).map(([key, value]) => (
-                          <div key={key} className="flex justify-between items-center">
-                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Allocation Differences</h3>
-                      <div className="space-y-2">
-                        {Object.entries(portfolioData.allocationAnalysis.allocationDifferences).map(([key, value]) => (
-                          <div key={key} className="flex justify-between items-center">
-                            <span className="text-gray-700 dark:text-gray-300">{key}</span>
-                            <span className={`font-medium ${value.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                              {value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-                      <Button 
-                        onClick={() => setIsRebalanceModalOpen(true)}
-                        className="w-full"
-                      >
-                        <FiRefreshCw className="mr-2" />
-                        Rebalance Portfolio
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          {/* Portfolio Value Trend and Performance Comparison */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PortfolioValueChart 
-              currentValue={portfolioSummary.totalInvested + portfolioSummary.totalResult}
-              currency={user.settings.currency}
-              initialHistoricalData={localHistoricalValues}
-              onSaveHistoricalData={handleSaveHistoricalData}
-            />
-            
-            <PerformanceComparisonChart 
-              portfolioPerformances={portfolioPerformances}
-              initialBenchmarks={localBenchmarks}
-              onSaveBenchmarks={handleSaveBenchmarks}
-            />
-          </div>
-
-          {/* Portfolio Breakdown Section */}
-          <section className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Portfolio Breakdown</h2>
-            {portfolioData.portfolio.map((portfolio, index) => (
-              <Card key={index} title={portfolio.name} className="shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
-                <div className="space-y-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Creation Date: {formatDate(portfolio.creationDate)}</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Invested</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {formatCurrency(portfolio.totalInvested, user.settings.currency)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Result</p>
-                      <p className={`text-lg font-semibold ${portfolio.totalResult >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatCurrency(portfolio.totalResult, user.settings.currency, true)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Return Percentage</p>
-                      <p className={`text-lg font-semibold ${portfolio.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatPercentage(portfolio.returnPercentage, true)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dividend Cash Action</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{portfolio.dividendCashAction}</p>
-                    </div>
-                  </div>
-
-                  {/* Instruments Table - Now using SortableTable */}
-                  <SortableTable
-                    data={portfolio.instruments}
-                    itemsPerPage={10}
-                    emptyMessage="No instruments found in this portfolio."
-                    columns={[
-                      {
-                        key: "fullName",
-                        header: "Instrument",
-                        sortable: true,
-                        filterable: true,
-                        render: (item) => (
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{item.fullName}</span>
-                        )
-                      },
-                      {
-                        key: "ticker",
-                        header: "Ticker",
-                        sortable: true,
-                        filterable: true,
-                        render: (item) => (
-                          <span className="text-gray-500 dark:text-gray-400">{item.ticker}</span>
-                        )
-                      },
-                      {
-                        key: "type",
-                        header: "Type",
-                        sortable: true,
-                        filterable: true,
-                        render: (item) => (
-                          <span className="text-gray-500 dark:text-gray-400">{item.type}</span>
-                        )
-                      },
-                      {
-                        key: "ownedQuantity",
-                        header: "Quantity",
-                        sortable: true,
-                        render: (item) => (
-                          <span className="text-gray-900 dark:text-gray-100">{item.ownedQuantity.toFixed(2)}</span>
-                        )
-                      },
-                      {
-                        key: "investedValue",
-                        header: "Invested",
-                        sortable: true,
-                        render: (item) => (
-                          <span className="text-gray-900 dark:text-gray-100">
-                            {formatCurrency(item.investedValue, user.settings.currency)}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "currentValue",
-                        header: "Current Value",
-                        sortable: true,
-                        render: (item) => (
-                          <span className="text-gray-900 dark:text-gray-100">
-                            {formatCurrency(item.currentValue, user.settings.currency)}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "resultValue",
-                        header: "Result",
-                        sortable: true,
-                        render: (item) => (
-                          <span className={`font-semibold ${item.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {formatCurrency(item.resultValue, user.settings.currency, true)}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "dividendYield",
-                        header: "Div. Yield",
-                        sortable: true,
-                        render: (item) => (
-                          <span className="text-gray-900 dark:text-gray-100">
-                            {item.dividendYield ? `${item.dividendYield}%` : 'N/A'}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "performance_1week",
-                        header: "1W Perf.",
-                        sortable: true,
-                        render: (item) => (
-                          <span className={`${item.performance_1week >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {item.performance_1week ? formatPercentage(item.performance_1week) : 'N/A'}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "performance_1month",
-                        header: "1M Perf.",
-                        sortable: true,
-                        render: (item) => (
-                          <span className={`${item.performance_1month >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {item.performance_1month ? formatPercentage(item.performance_1month) : 'N/A'}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "performance_3months",
-                        header: "3M Perf.",
-                        sortable: true,
-                        render: (item) => (
-                          <span className={`${item.performance_3months >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {item.performance_3months ? formatPercentage(item.performance_3months) : 'N/A'}
-                          </span>
-                        )
-                      },
-                      {
-                        key: "performance_1year",
-                        header: "1Y Perf.",
-                        sortable: true,
-                        render: (item) => (
-                          <span className={`${item.performance_1year >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {item.performance_1year ? formatPercentage(item.performance_1year) : 'N/A'}
-                          </span>
-                        )
-                      }
-                    ]}
-                  />
-                </div>
-              </Card>
-            ))}
-          </section>
+          {/* Portfolio Breakdown */}
+          <PortfolioBreakdown
+            portfolios={portfolioData.portfolio}
+            currency={user.settings.currency}
+          />
 
           {/* Chat assistant promo */}
-          <Card className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg rounded-xl p-6">
-            <div className="flex flex-col md:flex-row items-center justify-between">
-              <div className="mb-4 md:mb-0">
-                <h3 className="text-xl font-bold mb-2">Need help with your finances?</h3>
-                <p className="text-gray-100 text-lg">Chat with our AI assistant to get personalized advice and insights.</p>
-              </div>
-              <Link
-                to="/chat"
-                className="px-5 py-3 bg-white text-blue-600 rounded-md font-semibold hover:bg-blue-50 transition-colors shadow-md"
-              >
-                <FiMessageSquare className="inline-block mr-2" />
-                Start chatting
-              </Link>
-            </div>
-          </Card>
+          <ChatPromo />
         </>
       )}
 
