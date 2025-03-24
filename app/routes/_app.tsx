@@ -17,17 +17,17 @@ export default function AppLayout() {
       // Default to system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');
-    }
     
-    // Apply theme class
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(
-      storedTheme === 'dark' || 
-      (storedTheme === 'system' && prefersDark) || 
-      (!storedTheme && prefersDark) 
-        ? 'dark' 
-        : 'light'
-    );
+      // Apply theme class
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(
+        storedTheme === 'dark' || 
+        (storedTheme === 'system' && prefersDark) || 
+        (!storedTheme && prefersDark) 
+          ? 'dark' 
+          : 'light'
+      );
+    }
   }, []);
 
   // Close mobile menu when route changes

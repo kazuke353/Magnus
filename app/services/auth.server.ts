@@ -17,12 +17,12 @@ export const authenticator = new Authenticator<SessionData>(sessionStorage);
 authenticator.use(
   new FormStrategy(async ({ form }) => {
     console.log("FormStrategy: Strategy function started...");
-    const username = form.get("username") as string;
+    const email = form.get("email") as string;
     const password = form.get("password") as string;
 
-    const user = await verifyLogin(username, password);
+    const user = await verifyLogin(email, password);
     if (!user) {
-      throw new Error("Invalid username or password");
+      throw new Error("Invalid email or password");
     }
 
     console.log("FormStrategy: Authentication successful in strategy.");

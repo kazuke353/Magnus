@@ -47,6 +47,7 @@ export function addChatMessage() { return; }
 export function createChatSession() { return {}; }
 export function getChatMessages() { return; }
 export function getChatSessions() { return {}; }
+export function streamChatResponse() { return {}; }
 
 function generateTaskResponse(tasks: Task[], message: string): string {
   if (tasks.length === 0) {

@@ -1,48 +1,30 @@
-import { db } from './database.server';
-import { goals } from './schema';
-import { eq } from 'drizzle-orm';
+import { getDb } from './database.server';
+import { goals, Goal } from './schema'; // Import Goal type from schema.ts
+import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
-export interface Goal {
-  id: string;
-  userId: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  monthlyContribution: number;
-  expectedReturn: number;
-  currency: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export async function getUserGoals(userId: string): Promise<Goal[]> {
+  const db = getDb();
   try {
-    // Check if db and goals are properly initialized
-    if (!db || !goals) {
-      console.error('Database or goals schema not properly initialized');
-      return [];
-    }
-    
-    const userGoals = await db.select().from(goals).where(eq(goals.userId, userId));
+    const userGoals = await db.select()
+      .from(goals)
+      .where(eq(goals.userId, userId));
     return userGoals;
   } catch (error) {
     console.error('Error fetching user goals:', error);
-    // Return empty array instead of throwing to prevent cascading errors
-    return [];
+    return []; // Consistent with original behavior
   }
 }
 
 export async function getGoalById(goalId: string): Promise<Goal | null> {
+  const db = getDb();
   try {
-    if (!db || !goals) {
-      console.error('Database or goals schema not properly initialized');
-      return null;
-    }
-    
-    const [goal] = await db.select().from(goals).where(eq(goals.id, goalId));
-    return goal || null;
+    const result = await db.select()
+      .from(goals)
+      .where(eq(goals.id, goalId))
+      .limit(1);
+
+    return result[0] || null;
   } catch (error) {
     console.error('Error fetching goal by ID:', error);
     return null;
@@ -51,24 +33,15 @@ export async function getGoalById(goalId: string): Promise<Goal | null> {
 
 export async function createGoal(
   userId: string,
-  goalData: {
-    name: string;
-    targetAmount: number;
-    currentAmount: number;
-    targetDate: string;
-    monthlyContribution: number;
-    expectedReturn: number;
-    currency: string;
-  }
+  goalData: Omit<Goal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
 ): Promise<Goal> {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = uuidv4();
+
   try {
-    if (!db || !goals) {
-      throw new Error('Database or goals schema not properly initialized');
-    }
-    
-    const now = new Date().toISOString();
     const newGoal = {
-      id: uuidv4(),
+      id,
       userId,
       ...goalData,
       createdAt: now,
@@ -76,7 +49,12 @@ export async function createGoal(
     };
 
     await db.insert(goals).values(newGoal);
-    return newGoal;
+
+    const createdGoal = await getGoalById(id);
+    if (!createdGoal) {
+      throw new Error('Goal not found after creation');
+    }
+    return createdGoal;
   } catch (error) {
     console.error('Error creating goal:', error);
     throw new Error('Failed to create goal');
@@ -86,31 +64,20 @@ export async function createGoal(
 export async function updateGoal(
   goalId: string,
   userId: string,
-  goalData: Partial<{
-    name: string;
-    targetAmount: number;
-    currentAmount: number;
-    targetDate: string;
-    monthlyContribution: number;
-    expectedReturn: number;
-    currency: string;
-  }>
+  goalData: Partial<Omit<Goal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
 ): Promise<Goal | null> {
+  const db = getDb();
+  const now = new Date().toISOString();
+
   try {
-    if (!db || !goals) {
-      throw new Error('Database or goals schema not properly initialized');
-    }
-    
-    const now = new Date().toISOString();
-    
     await db.update(goals)
       .set({
         ...goalData,
         updatedAt: now,
       })
-      .where(eq(goals.id, goalId) && eq(goals.userId, userId));
-    
-    return getGoalById(goalId);
+      .where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+
+    return await getGoalById(goalId);
   } catch (error) {
     console.error('Error updating goal:', error);
     return null;
@@ -118,15 +85,13 @@ export async function updateGoal(
 }
 
 export async function deleteGoal(goalId: string, userId: string): Promise<boolean> {
+  const db = getDb();
   try {
-    if (!db || !goals) {
-      throw new Error('Database or goals schema not properly initialized');
-    }
-    
-    await db.delete(goals)
-      .where(eq(goals.id, goalId) && eq(goals.userId, userId));
-    
-    return true;
+    const result = await db.delete(goals)
+      .where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+
+    // Return true if a row was deleted
+    return result.length > 0;
   } catch (error) {
     console.error('Error deleting goal:', error);
     return false;

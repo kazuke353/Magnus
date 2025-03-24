@@ -9,6 +9,9 @@ interface ModelSelectorProps {
 
 export default function ModelSelector({ models, currentModelIndex }: ModelSelectorProps) {
   const submit = useSubmit();
+  if (!models) {
+    return null;
+  }
   
   const selectOptions: SelectOption[] = models.map((model) => ({
     value: model.index.toString(),

@@ -158,9 +158,8 @@ export default function GoalForm({
             <Input
               id="currentAmount"
               name="currentAmount"
-              type="number"
+              type="float"
               min="0"
-              step="100"
               placeholder={currentPortfolioValue.toString()}
               value={formData.currentAmount}
               onChange={handleChange}
@@ -208,7 +207,7 @@ export default function GoalForm({
               name="monthlyContribution"
               type="number"
               min="0"
-              step="100"
+              step="50"
               placeholder="1000"
               value={formData.monthlyContribution}
               onChange={handleChange}
@@ -233,7 +232,7 @@ export default function GoalForm({
             type="number"
             min="0"
             max="30"
-            step="0.5"
+            step="0.01"
             placeholder="6"
             value={formData.expectedReturn}
             onChange={handleChange}

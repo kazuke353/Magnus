@@ -51,6 +51,26 @@ export const goals = sqliteTable("goals", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const userPortfolios = sqliteTable("user_portfolios", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  portfolioData: text("portfolio_data", { mode: "json" }).notNull(),
+  fetchDate: text("fetch_date").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const trading212Pies = sqliteTable("trading212_pies", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  allocation: integer("allocation").notNull(),
+  pieData: text("pie_data").notNull(),
+  importDate: text("import_date").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // User type
 export interface User {
   id: string;
@@ -61,7 +81,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   settings: {
-    theme?: 'light' | 'dark' | 'system';
+    theme?: 'light' | 'dark';
     currency?: string;
     language?: string;
     notifications?: boolean;

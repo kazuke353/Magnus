@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Form, Link, useActionData, useNavigation, useSearchParams } from "@remix-run/react";
 import { ActionFunctionArgs, LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { authenticator, isAuthenticated, commitSession } from "~/services/auth.server";
+import { authenticator, isAuthenticated } from "~/services/auth.server";
+import { verifyLogin, getUserById } from "~/db/user.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
+import { setUserSession } from "~/services/session.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await isAuthenticated(request);
@@ -14,18 +16,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   try {
     console.log("Login action: Attempting authenticator.authenticate...");
-    const user = await authenticator.authenticate("user-pass", request);
+    const formData = await request.formData();
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const user = await verifyLogin(email, password);
+    if (!user) {
+      throw new Error("Invalid email or password");
+    }
     console.log("Login action: authenticator.authenticate call completed successfully. User:", user);
 
-    const session = await commitSession(request, user)
-    console.log(session)
-
-    // Check if there's a redirectTo parameter
-    const formData = await request.formData();
-    const redirectTo = formData.get("redirectTo") as string || "/dashboard";
-
-    return redirect(redirectTo, {
-      headers: { "Set-Cookie": session },
+    const sessionCookie = await setUserSession(request, user.id);
+    
+    return redirect("/dashboard", {
+      headers: { 
+        "Set-Cookie": sessionCookie 
+      },
     });
   } catch (error) {
     console.error("Login action: authenticator.authenticate error:", error);

@@ -147,11 +147,6 @@ export default function Settings() {
       <Card title="Account Information">
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Username</h3>
-            <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{user.username}</p>
-          </div>
-          
-          <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h3>
             <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{user.email}</p>
           </div>

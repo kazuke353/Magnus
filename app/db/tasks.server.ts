@@ -1,136 +1,128 @@
 import { getDb } from './database.server';
-import { Task } from './schema';
+import { Task, tasks } from './schema';
 import { v4 as uuidv4 } from 'uuid';
+import { eq, and, gte, lte, asc, desc } from 'drizzle-orm';
 
-export function createTask(
+// Utility type for omitting properties (since `Omit` is built into TypeScript)
+type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+
+export async function createTask(
   userId: string,
   taskData: Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed'>
-): Task {
+): Promise<Task> {
   const db = getDb();
   const now = new Date().toISOString();
   const id = uuidv4();
 
   try {
-    const insertStmt = db.prepare(
-      `INSERT INTO tasks (
-        id, userId, title, description, dueDate, completed, category, priority, amount, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    insertStmt.run(
+    await db.insert(tasks).values({
       id,
       userId,
-      taskData.title,
-      taskData.description || null,
-      taskData.dueDate || null,
-      0,
-      taskData.category || null,
-      taskData.priority || 'medium',
-      taskData.amount || null,
-      now,
-      now
-    );
+      title: taskData.title,
+      description: taskData.description || null,
+      dueDate: taskData.dueDate || null,
+      completed: false, // Default to false as per schema
+      category: taskData.category || null,
+      amount: taskData.amount || null,
+      createdAt: now,
+      updatedAt: now
+    });
 
-    return getTaskById(id);
-
+    const newTask = await getTaskById(id);
+    if (!newTask) {
+      throw new Error('Task not found after creation');
+    }
+    return newTask;
   } catch (error) {
     console.error("Error in createTask:", error);
     throw error;
   }
 }
 
-export function getTaskById(id: string): Task {
+export async function getTaskById(id: string): Promise<Task> {
   const db = getDb();
   try {
-    const stmt = db.prepare('SELECT * FROM tasks WHERE id = ?');
-    const task = stmt.get(id) as Task | undefined;
+    const result = await db.select()
+      .from(tasks)
+      .where(eq(tasks.id, id))
+      .limit(1);
 
-    if (!task) {
+    if (!result.length) {
       throw new Error(`Task with id ${id} not found`);
     }
 
-    return {
-      ...task,
-      completed: Boolean(task.completed)
-    };
+    return result[0];
   } catch (error) {
     console.error("getTaskById: Error during database interaction:", error);
-    throw error; // Or handle differently based on your error handling policy
+    throw error;
   }
 }
 
-export function getUserTasks(userId: string): Task[] {
+export async function getUserTasks(userId: string): Promise<Task[]> {
   const db = getDb();
   try {
-    const stmt = db.prepare('SELECT * FROM tasks WHERE userId = ? ORDER BY dueDate ASC, createdAt DESC');
-    const tasks = stmt.all(userId) as Task[];
+    const result = await db.select()
+      .from(tasks)
+      .where(eq(tasks.userId, userId))
+      .orderBy(asc(tasks.dueDate), desc(tasks.createdAt));
 
-    return tasks.map(task => ({
-      ...task,
-      completed: Boolean(task.completed)
-    }));
+    return result;
   } catch (error) {
     console.error("getUserTasks: Error during database interaction:", error);
-    return []; // Or throw error, depending on how you want to handle failures
+    return []; // Consistent with original behavior
   }
 }
 
-export function getTasksByDateRange(userId: string, startDate: string, endDate: string): Task[] {
+export async function getTasksByDateRange(userId: string, startDate: string, endDate: string): Promise<Task[]> {
   const db = getDb();
   try {
-    const stmt = db.prepare(
-      'SELECT * FROM tasks WHERE userId = ? AND dueDate >= ? AND dueDate <= ? ORDER BY dueDate ASC'
-    );
-    const tasks = stmt.all(userId, startDate, endDate) as Task[];
+    const result = await db.select()
+      .from(tasks)
+      .where(and(
+        eq(tasks.userId, userId),
+        gte(tasks.dueDate, startDate),
+        lte(tasks.dueDate, endDate)
+      ))
+      .orderBy(tasks.dueDate.asc());
 
-    return tasks.map(task => ({
-      ...task,
-      completed: Boolean(task.completed)
-    }));
+    return result;
   } catch (error) {
     console.error("getTasksByDateRange: Error during database interaction:", error);
-    return []; // Or throw error, depending on your error handling
+    return []; // Consistent with original behavior
   }
 }
 
-export function updateTask(id: string, taskData: Partial<Task>): Task {
+export async function updateTask(id: string, taskData: Partial<Task>): Promise<Task> {
   const db = getDb();
   const now = new Date().toISOString();
 
   try {
-    const currentTask = getTaskById(id);
+    const currentTask = await getTaskById(id);
 
-    const updatedTask = {
-      ...currentTask,
+    const updatedFields = {
       ...taskData,
-      updatedAt: now,
-      completed: taskData.completed !== undefined ? taskData.completed : currentTask.completed
+      updatedAt: now
     };
 
-    const { id: taskId, userId, createdAt, ...dataToUpdate } = updatedTask;
+    await db.update(tasks)
+      .set(updatedFields)
+      .where(eq(tasks.id, id));
 
-    const keys = Object.keys(dataToUpdate);
-    const setClause = keys.map(key => `${key} = ?`).join(', ');
-
-    const updateStmt = db.prepare(
-      `UPDATE tasks SET ${setClause} WHERE id = ?`
-    );
-    updateStmt.run(...Object.values(dataToUpdate), taskId);
-
-    return getTaskById(id);
-
+    const updatedTask = await getTaskById(id);
+    return updatedTask;
   } catch (error) {
     console.error("updateTask: Error during database interaction:", error);
     throw error;
   }
 }
 
-export function deleteTask(id: string): void {
+export async function deleteTask(id: string): Promise<void> {
   const db = getDb();
   try {
-    const deleteStmt = db.prepare('DELETE FROM tasks WHERE id = ?');
-    deleteStmt.run(id);
+    await db.delete(tasks)
+      .where(eq(tasks.id, id));
   } catch (error) {
     console.error("deleteTask: Error during database interaction:", error);
-    throw error; // Or handle error as needed (e.g., log and return void)
+    throw error;
   }
 }

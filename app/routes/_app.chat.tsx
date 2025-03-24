@@ -19,7 +19,7 @@ import { errorResponse } from "~/utils/error-handler";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await requireAuthentication(request, "/login");
-    const chatHistory = await getChatHistory(user.id);
+    const chatHistory = null;
     
     return json({ user, chatHistory });
   } catch (error) {
@@ -84,73 +84,6 @@ export default function Chat() {
       setChatHistory(loaderData.chatHistory);
     }
   }, [loaderData.chatHistory]);
-  
-  // Handle streaming response
-  useEffect(() => {
-    if (actionData?.streaming && actionData.userMessage) {
-      // Start streaming
-      setIsStreaming(true);
-      setStreamingResponse("");
-      
-      const eventSource = streamChatResponse(actionData.userMessage.id);
-      
-      eventSource.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.content) {
-          setStreamingResponse((prev) => prev + data.content);
-        }
-      });
-      
-      eventSource.addEventListener("error", () => {
-        eventSource.close();
-        setIsStreaming(false);
-        
-        // Add the completed message to chat history
-        if (streamingResponse) {
-          setChatHistory((prev) => [
-            ...prev,
-            {
-              id: `temp-${Date.now()}`,
-              role: "assistant",
-              content: streamingResponse,
-              timestamp: new Date().toISOString(),
-              model
-            }
-          ]);
-        } else {
-          // Show error if no response was received
-          showToast({
-            type: "error",
-            message: "Failed to get a response. Please try again.",
-            duration: 5000
-          });
-        }
-      });
-      
-      eventSource.addEventListener("complete", (event) => {
-        const data = JSON.parse(event.data);
-        eventSource.close();
-        setIsStreaming(false);
-        
-        // Update chat history with the complete message
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            id: data.id,
-            role: "assistant",
-            content: data.content,
-            timestamp: data.timestamp,
-            model: data.model
-          }
-        ]);
-      });
-      
-      return () => {
-        eventSource.close();
-      };
-    }
-  }, [actionData, model]);
   
   // Scroll to bottom when messages change
   useEffect(() => {

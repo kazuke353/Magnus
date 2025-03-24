@@ -1,104 +1,81 @@
-import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
+import path from "path";
+import { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } from "./schema";
+import { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 
 let db: Database.Database;
+let drizzleDb: ReturnType<typeof drizzle>;
 
-function getDb(): Database.Database {
+function getDb() {
   if (!db) {
-    const dbPath = path.resolve('./data/magnus.db');
-    
-    // Ensure the data directory exists
+    const dbPath = path.resolve("./data/magnus.db");
     const dataDir = path.dirname(dbPath);
     if (!fs.existsSync(dataDir)) {
+      console.log("Creating data directory:", dataDir);
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    
+
+    console.log("Initializing database at:", dbPath);
     db = new Database(dbPath);
-    
-    // Enable foreign keys
-    db.pragma('foreign_keys = ON');
-    
-    // Initialize database schema
+    db.pragma("foreign_keys = ON");
+
+    drizzleDb = drizzle(db, { schema: { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } });
     initializeDatabase();
   }
-  
-  return db;
+  return drizzleDb;
+}
+
+function generateTableSQL(table: SQLiteTable) {
+  const tableName = table[Symbol.for("drizzle:Name")];
+  const columns = Object.entries(table).filter(([key]) => key !== "sqliteTable") as [string, SQLiteColumn][];
+
+  const columnDefs = columns.map(([_, column]) => {
+    // Use the SQL column name from the schema, not the TS property name
+    const columnName = column.name; // e.g., "password_hash" instead of "passwordHash"
+    let def = `${columnName} ${column.columnType.toUpperCase()}`;
+
+    if (column.primary) def += " PRIMARY KEY";
+    if (column.notNull) def += " NOT NULL";
+    if (column.default !== undefined) {
+      let defaultValue = column.default;
+      if (typeof defaultValue === "object") {
+        defaultValue = `'${JSON.stringify(defaultValue)}'`;
+      } else if (typeof defaultValue === "boolean") {
+        defaultValue = defaultValue ? 1 : 0;
+      } else if (typeof defaultValue === "string") {
+        defaultValue = `'${defaultValue}'`;
+      }
+      def += ` DEFAULT ${defaultValue}`;
+    }
+    if (column.references) {
+      const refTable = column.references().table[Symbol.for("drizzle:Name")];
+      const refColumn = column.references().columns[0].name;
+      def += ` REFERENCES ${refTable}(${refColumn}) ON DELETE CASCADE`;
+    }
+    return def;
+  }).join(", ");
+
+  return `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs})`;
 }
 
 function initializeDatabase() {
-  // Users table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      firstName TEXT,
-      lastName TEXT,
-      settings TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    )
-  `);
-  
-  // Tasks table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      dueDate TEXT,
-      completed INTEGER NOT NULL DEFAULT 0,
-      amount REAL,
-      category TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-  
-  // Chat messages table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      model TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-  
-  // Portfolio data table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS user_portfolios (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      portfolioData TEXT NOT NULL,
-      fetchDate TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-  
-  // Trading 212 Pies table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS trading212_pies (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      name TEXT NOT NULL,
-      allocation INTEGER NOT NULL,
-      pieData TEXT NOT NULL,
-      importDate TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
+  const tables = [users, tasks, chatMessages, goals, userPortfolios, trading212Pies];
+
+  // Drop existing tables (for development/testing; remove in production)
+  db.exec("DROP TABLE IF EXISTS users");
+
+  for (const table of tables) {
+    try {
+      const createTableQuery = generateTableSQL(table);
+      db.exec(createTableQuery);
+    } catch (error) {
+      console.error(`Failed to create table ${table[Symbol.for("drizzle:Name")]}:`, error);
+      throw error;
+    }
+  }
 }
 
 export { getDb };

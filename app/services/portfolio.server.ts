@@ -1,28 +1,27 @@
-import { fetchPortfolioData as fetchPortfolioDataUtil } from "~/utils/portfolio_fetcher";
+import { fetchPortfolioData as fetchPortfolioDataUtil, PerformanceMetrics } from "~/utils/portfolio_fetcher";
 import { createApiError, createNetworkError, handleError, ErrorType, createError } from "~/utils/error-handler";
 import { UserSettings } from "~/db/schema";
 import { getDb } from '~/db/database.server';
 import { v4 as uuidv4 } from 'uuid';
-import { PerformanceMetrics } from '~/utils/portfolio_fetcher';
-import { format, addMinutes } from 'date-fns';
+import { userPortfolios } from '~/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { addMinutes } from 'date-fns';
 
 // Cache duration in minutes
 const CACHE_DURATION = 5;
 
 /**
  * Fetches portfolio data from the external API
- * @param budget - Monthly budget amount
- * @param cc - Country code
- * @returns Portfolio performance metrics
+ * @param budgetOrUserId - Monthly budget amount or user ID
+ * @param cc - Country code (optional)
+ * @returns Portfolio performance metrics or null
  */
 export async function getPortfolioData(budgetOrUserId: number | string, cc?: string): Promise<PerformanceMetrics | null> {
   try {
-    // If the first parameter is a string, assume it's a userId and try to get cached data
     if (typeof budgetOrUserId === 'string') {
       return await getCachedPortfolioData(budgetOrUserId);
     }
     
-    // Otherwise, fetch fresh data using the budget and country code
     const budget = budgetOrUserId as number;
     const countryCode = cc || 'BG';
     
@@ -34,16 +33,13 @@ export async function getPortfolioData(budgetOrUserId: number | string, cc?: str
     
     return data;
   } catch (error) {
-    // Determine if it's a network error or API error
     if (error instanceof Error) {
       if (error.message.includes("network") || error.message.includes("connection")) {
         throw createNetworkError("Failed to connect to portfolio service");
-      } else if (!('type' in error)) { // Only wrap if not already an AppError
+      } else if (!('type' in error)) {
         throw createApiError("Error fetching portfolio data", { originalError: error.message });
       }
     }
-    
-    // Re-throw the error for the global error handler
     throw handleError(error);
   }
 }
@@ -56,10 +52,8 @@ export async function getPortfolioData(budgetOrUserId: number | string, cc?: str
  */
 export async function fetchPortfolioData(settings: UserSettings, userId: string): Promise<PerformanceMetrics> {
   try {
-    // Try to get cached data first
     const cachedData = await getCachedPortfolioData(userId);
 
-    // Check if cached data exists and is still valid
     if (cachedData) {
       const fetchDate = new Date(cachedData.fetchDate);
       const now = new Date();
@@ -67,25 +61,17 @@ export async function fetchPortfolioData(settings: UserSettings, userId: string)
       if (addMinutes(fetchDate, CACHE_DURATION) > now) {
         console.log("Returning cached portfolio data.");
         return cachedData;
-      } else {
-        console.log("Cached data is stale. Fetching new data.");
       }
+      console.log("Cached data is stale. Fetching new data.");
     }
 
-    // Fetch fresh data if no valid cache exists
     const portfolioData = await fetchPortfolioDataUtil(settings.monthlyBudget, settings.country);
     
     if (!portfolioData) {
-      throw createError(
-        ErrorType.API,
-        "Failed to fetch portfolio data from external service",
-        500
-      );
+      throw createError(ErrorType.API, "Failed to fetch portfolio data from external service", 500);
     }
 
-    // Save the fresh data to cache
     await savePortfolioData(userId, portfolioData);
-
     return portfolioData;
   } catch (error) {
     console.error("Error in fetchPortfolioData:", error);
@@ -94,34 +80,30 @@ export async function fetchPortfolioData(settings: UserSettings, userId: string)
 }
 
 /**
- * Saves portfolio data to the database
+ * Saves portfolio data to the database as a new historical record
  * @param userId - User ID
  * @param portfolioData - Portfolio data to save
+ * @returns The ID of the newly created portfolio record
  */
-export async function savePortfolioData(userId: string, portfolioData: PerformanceMetrics): Promise<void> {
+export async function savePortfolioData(userId: string, portfolioData: PerformanceMetrics): Promise<string> {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const portfolioId = uuidv4();
+
   try {
-    const db = getDb();
-    const now = new Date().toISOString();
-    const portfolioId = uuidv4();
+    const fetchDate = portfolioData.fetchDate || now;
 
-    // Ensure fetchDate is set
-    if (!portfolioData.fetchDate) {
-      portfolioData.fetchDate = now;
-    }
+    await db.insert(userPortfolios)
+      .values({
+        id: portfolioId,
+        userId,
+        portfolioData: JSON.stringify(portfolioData), // Using text column as per schema
+        fetchDate,
+        createdAt: now,
+        updatedAt: now
+      });
 
-    const insertStmt = db.prepare(
-      `INSERT OR REPLACE INTO user_portfolios (id, userId, portfolioData, fetchDate, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    );
-    
-    insertStmt.run(
-      portfolioId,
-      userId,
-      JSON.stringify(portfolioData),
-      portfolioData.fetchDate,
-      now,
-      now
-    );
+    return portfolioId; // Return the ID for potential tracking
   } catch (error) {
     console.error("Error saving portfolio data to database:", error);
     throw createError(
@@ -134,52 +116,52 @@ export async function savePortfolioData(userId: string, portfolioData: Performan
 }
 
 /**
- * Retrieves cached portfolio data from the database
+ * Retrieves the most recent cached portfolio data from the database
  * @param userId - User ID
- * @returns Cached portfolio data or null if not found
+ * @returns Most recent cached portfolio data or null if not found
  */
 export async function getCachedPortfolioData(userId: string): Promise<PerformanceMetrics | null> {
+  const db = getDb();
+
   try {
-    const db = getDb();
+    const result = await db.select({
+      portfolioData: userPortfolios.portfolioData,
+      fetchDate: userPortfolios.fetchDate
+    })
+      .from(userPortfolios)
+      .where(eq(userPortfolios.userId, userId))
+      .orderBy(desc(userPortfolios.updatedAt))
+      .limit(1);
 
-    const stmt = db.prepare(
-      'SELECT portfolioData, fetchDate FROM user_portfolios WHERE userId = ? ORDER BY updatedAt DESC LIMIT 1'
-    );
-    
-    const result = stmt.get(userId) as { portfolioData: string; fetchDate: string } | undefined;
-
-    if (result && result.portfolioData) {
-      try {
-        const parsedData = JSON.parse(result.portfolioData);
-        return { ...parsedData, fetchDate: result.fetchDate } as PerformanceMetrics;
-      } catch (parseError) {
-        console.error("Error parsing cached portfolio data:", parseError);
-        return null;
-      }
-    } else {
+    if (result.length === 0) {
       console.log("No cached portfolio data found for this user.");
+      return null;
+    }
+
+    const { portfolioData, fetchDate } = result[0];
+    try {
+      const parsedData = JSON.parse(portfolioData);
+      return { ...parsedData, fetchDate } as PerformanceMetrics;
+    } catch (parseError) {
+      console.error("Error parsing cached portfolio data:", parseError);
       return null;
     }
   } catch (error) {
     console.error("Error fetching portfolio data from database:", error);
-    // Return null instead of throwing to allow fallback to fresh data fetch
     return null;
   }
 }
 
 /**
- * Clears cached portfolio data for a user
+ * Clears all cached portfolio data for a user
  * @param userId - User ID
  */
 export async function clearCachedPortfolioData(userId: string): Promise<void> {
+  const db = getDb();
+
   try {
-    const db = getDb();
-    
-    const deleteStmt = db.prepare(
-      'DELETE FROM user_portfolios WHERE userId = ?'
-    );
-    
-    deleteStmt.run(userId);
+    await db.delete(userPortfolios)
+      .where(eq(userPortfolios.userId, userId));
   } catch (error) {
     console.error("Error clearing cached portfolio data:", error);
     throw createError(
@@ -192,7 +174,7 @@ export async function clearCachedPortfolioData(userId: string): Promise<void> {
 }
 
 /**
- * Checks if portfolio data needs refreshing
+ * Checks if portfolio data needs refreshing based on the most recent fetch
  * @param userId - User ID
  * @returns True if data needs refreshing, false otherwise
  */
@@ -207,4 +189,31 @@ export async function needsRefresh(userId: string): Promise<boolean> {
   const now = new Date();
   
   return addMinutes(fetchDate, CACHE_DURATION) < now;
+}
+
+/**
+ * Retrieves all historical portfolio data for a user
+ * @param userId - User ID
+ * @returns Array of all historical portfolio data entries
+ */
+export async function getPortfolioHistory(userId: string): Promise<PerformanceMetrics[]> {
+  const db = getDb();
+
+  try {
+    const results = await db.select({
+      portfolioData: userPortfolios.portfolioData,
+      fetchDate: userPortfolios.fetchDate
+    })
+      .from(userPortfolios)
+      .where(eq(userPortfolios.userId, userId))
+      .orderBy(desc(userPortfolios.fetchDate)); // Order by fetchDate for chronological history
+
+    return results.map(({ portfolioData, fetchDate }) => {
+      const parsedData = JSON.parse(portfolioData);
+      return { ...parsedData, fetchDate } as PerformanceMetrics;
+    });
+  } catch (error) {
+    console.error("Error fetching portfolio history:", error);
+    return [];
+  }
 }
