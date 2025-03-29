@@ -3,16 +3,23 @@ import { Task } from "~/db/schema";
 import { formatDateForInput, getCurrentDateForInput } from "~/utils/date";
 import Button from "./Button";
 import Input from "./Input";
-import { FiX, FiPlus, FiList } from "react-icons/fi";
+import { FiX, FiPlus, FiList, FiRepeat } from "react-icons/fi";
 
 interface TaskFormProps {
   task?: Task;
   onSubmit: (formData: FormData) => void;
   onClose: () => void;
   isSubmitting?: boolean;
+  onSwitchToRecurring?: () => void;
 }
 
-export default function TaskForm({ task, onSubmit, onClose, isSubmitting = false }: TaskFormProps) {
+export default function TaskForm({ 
+  task, 
+  onSubmit, 
+  onClose, 
+  isSubmitting = false,
+  onSwitchToRecurring
+}: TaskFormProps) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [dueDate, setDueDate] = useState(task?.dueDate ? formatDateForInput(task.dueDate) : "");
@@ -89,23 +96,37 @@ export default function TaskForm({ task, onSubmit, onClose, isSubmitting = false
             <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {showBulkInput ? "Add Multiple Tasks" : "Add Single Task"}
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={toggleBulkInput}
-              className="text-sm"
-            >
-              {showBulkInput ? (
-                <>
-                  <FiPlus className="mr-1" /> Single Task
-                </>
-              ) : (
-                <>
-                  <FiList className="mr-1" /> Multiple Tasks
-                </>
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleBulkInput}
+                className="text-sm"
+              >
+                {showBulkInput ? (
+                  <>
+                    <FiPlus className="mr-1" /> Single Task
+                  </>
+                ) : (
+                  <>
+                    <FiList className="mr-1" /> Multiple Tasks
+                  </>
+                )}
+              </Button>
+              
+              {onSwitchToRecurring && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onSwitchToRecurring}
+                  className="text-sm"
+                >
+                  <FiRepeat className="mr-1" /> Make Recurring
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
           
           {showBulkInput ? (

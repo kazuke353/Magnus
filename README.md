@@ -1,86 +1,79 @@
-# Magnus - Personal Life Guide
+# Personal Portfolio Dashboard - Your Intelligent Investment Hub
 
-Magnus is a comprehensive personal finance management application designed to help users track their investments (with specific integration for Trading 212), manage financial or life goals, organize tasks, and interact with an AI financial or life assistant.
+[![Remix](https://img.shields.io/badge/Remix-v2-blueviolet.svg)](https://remix.run) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3-blue.svg)](https://tailwindcss.com/) [![OpenAI API](https://img.shields.io/badge/OpenAI_API-Chat-green.svg)](https://platform.openai.com/docs/api-reference)
 
-[![Remix](https://img.shields.io/badge/Remix-v2-blueviolet.svg)](https://remix.run) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3-blue.svg)](https://tailwindcss.com/)
+**[Live Demo Link Here -  *(Replace with your actual demo link if you have one)* ]**
 
-## Features
+**(Optional: Add a compelling screenshot of your dashboard here)**
 
-* **Dashboard:** Provides a quick overview of your portfolio summary, upcoming tasks, and progress towards financial goals.
-* **Portfolio Tracking:**
-    * Fetches and displays investment data directly from the Trading 212 API (pies, instruments, cash).
-    * Enriches instrument data with details from Yahoo Finance (dividend yield, historical performance).
-    * Calculates overall portfolio performance (total invested, result, return percentage).
-    * Visualizes portfolio allocation (pie chart) and value trends (line chart).
-    * Compares portfolio performance against user-defined benchmarks.
-    * Provides detailed allocation analysis (target vs. current vs. difference).
-    * Suggests rebalancing actions based on target allocations and optional new investments.
-    * Includes database-backed caching for portfolio data to minimize API calls.
-    * Supports importing Trading 212 pie data via CSV and exporting portfolio data as JSON.
-    * Allows manual entry and editing of historical portfolio values and benchmarks.
-    * Displays a sortable and filterable breakdown of instruments within each portfolio pie.
-* **Goal Management:**
-    * Create, track, update, and delete long-term financial goals (e.g., saving for a mortgage down payment).
-    * Visualizes progress towards goals based on current portfolio value and projected growth.
-    * Calculates projected outcomes based on monthly contributions and expected returns.
-    * Provides milestone notifications.
-* **Task Management:**
-    * Create, view, update, delete, and mark tasks as complete.
-    * Assign details like description, due date, category, priority, and financial amount.
-    * View tasks in a filterable list (All, Today, Upcoming, Completed, Incomplete) or a calendar view.
-    * Supports bulk task creation and import from JSON (with an AI helper prompt).
-* **AI Financial Assistant:**
-    * Chat interface to interact with a backend AI assistant for financial insights.
-    * Supports streaming responses.
-    * Allows model selection (if supported by backend).
-    * Can display sources provided by the assistant.
-* **User Settings:**
-    * Manage personal preferences like country, currency (e.g., USD, EUR), monthly budget, and theme (light/dark/system).
-* **Authentication:** Secure user registration and login system.
+## Project Description
 
-## Tech Stack
+**Personal Portfolio Dashboard** is a web application designed to empower you with intelligent insights and control over your investment portfolio. Built with Remix, Tailwind CSS, and powered by AI, this app goes beyond simple portfolio tracking. It provides a comprehensive view of your investments, automated allocation strategies, insightful analysis, and forward-looking projections, all in one user-friendly dashboard.
 
-* **Framework:** Remix.run
-* **Language:** TypeScript
-* **Frontend:** React
-* **Styling:** Tailwind CSS
-* **Database:** SQLite
-* **ORM:** Drizzle ORM
-* **Authentication:** Remix Auth, bcryptjs
-* **Data Fetching:** Axios, Yahoo-Finance2
-* **Charting:** Chart.js, react-chartjs-2
-* **Validation:** Zod
-* **Date Handling:** date-fns
-* **UI Components:** Headless UI (Tailwind), React Icons (Fi)
+**Key Features:**
 
-## Setup & Installation
+*   **Portfolio Performance at a Glance:**  Quickly see your overall portfolio performance, total invested value, returns, and key summary metrics on a dynamic dashboard.
+*   **Grouped Holdings with Intelligent Allocation:**  Organize your investments into custom groups (e.g., "Next-Gen Growth," "REIT," "Defensive Growth"). Define target allocations for each group and let the app intelligently distribute your budget and guide your investment decisions.
+*   **Automated Budgeting & Scheduling:**  Set up recurring monthly contributions to your portfolio and easily adjust your budget for specific months. Plan your investment schedule and stay on track with your financial goals.
+*   **Trading 212 Pie Integration (Future):**  Planned support for seamless integration with Trading 212 "Pies," including transaction history import via CSV and potentially API for enhanced data synchronization.
+*   **Forward-Looking Portfolio Projections:**  Get estimated projections of your portfolio's potential performance over 1, 5, and 10-year horizons, helping you visualize long-term growth scenarios.
+*   **AI-Powered Portfolio Analysis:**  Leverage the power of multiple Large Language Models (LLMs) like Qwen 2.5, ChatGPT, and DeepSeek to gain in-depth analysis of your portfolio.  Benefit from a consensus analysis generated by a final summarizing LLM, providing unique insights and perspectives on your investments.
+*   **Interactive Charts and Visualizations:**  Explore your portfolio allocation, performance, and other key metrics through interactive and informative charts, making it easy to understand complex financial data.
+*   **Task Management:**  Utilize a built-in task management system to schedule and manage investment-related tasks and reminders.
+*   **Settings Page:**  Customize your app experience with settings for currency, budget, and other preferences.
+*   **Secure User Authentication:**  Built with Remix's robust framework, ensuring secure user accounts and data protection.
+
+## Technologies Used
+
+*   **[Remix](https://remix.run):**  Full-stack web framework for building fast, resilient user experiences.
+*   **[Tailwind CSS](https://tailwindcss.com/):**  Utility-first CSS framework for rapid and customizable styling.
+*   **[React](https://reactjs.org/):**  JavaScript library for building user interfaces.
+*   **[Node.js](https://nodejs.org/):**  JavaScript runtime environment.
+*   **[OpenAI API](https://platform.openai.com/docs/api-reference):**  For integration with Large Language Models to power portfolio analysis and potentially future AI-driven features.
+*   **(Potentially:  Mention your database technology here, e.g., [Prisma](https://www.prisma.io/), [Supabase](https://supabase.com/), etc.)**
+*   **(Potentially:  Mention charting library, e.g., [Chart.js](https://www.chartjs.org/), [Recharts](https://recharts.org/), etc.)**
+
+## Development
+
+To get started with development:
 
 1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd <repository-folder>
+
+    ```shellscript
+    git clone [your-repository-url]
+    cd [your-project-directory]
     ```
+
 2.  **Install dependencies:**
-    ```bash
+
+    ```shellscript
     npm install
-    # or yarn install
     ```
-3.  **Environment Variables:**
-    * Create a `.env` file in the root directory.
-    * Add necessary environment variables, particularly `API_KEY` for the Trading 212 API:
-        ```env
-        API_KEY="YOUR_TRADING_212_API_KEY"
-        # Add other variables like session secrets if needed
-        SESSION_SECRET="your-super-secret-session-key"
-        ```
-4.  **Database Setup:** The SQLite database (`magnus.db`) will be automatically created in the `./data/` directory on the first run if it doesn't exist.
-5.  **(Optional) Chat Backend:** This application interacts with a separate backend (likely FastAPI) for chat functionality. Ensure that backend server is running (typically on `http://localhost:8000` or `http://127.0.0.1:8000` based on the code).
 
-## Running the App
+3.  **Set up your environment variables:**
 
-1.  **Start the development server:**
-    ```bash
+    *   Create a `.env` file in the root of your project.
+    *   **(List any required environment variables here, e.g., API keys, database connection strings, etc.  Provide example or placeholder values if appropriate.)**
+
+    ```env
+    # Example .env (replace with your actual values)
+    OPENAI_API_KEY=your_openai_api_key_here
+    DATABASE_URL="your_database_connection_string_here"
+    ```
+
+4.  **Run the development server:**
+
+    ```shellscript
     npm run dev
-    # or yarn dev
     ```
-2.  Open your browser and navigate to `http://localhost:3000` (or the specified port).
+
+    This will start the Remix development server, and you can access the app in your browser at `http://localhost:3000`.
+
+## Deployment
+
+### Building for Production
+
+Before deploying, build your app for production:
+
+```shellscript
+npm run build

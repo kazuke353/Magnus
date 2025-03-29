@@ -6,11 +6,27 @@ import { verifyLogin, getUserById } from "~/db/user.server";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 import { setUserSession } from "~/services/session.server";
+import { errorResponse } from "~/utils/error-handler";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await isAuthenticated(request);
-  if (user) return redirect("/dashboard");
-  return null;
+  try {
+    const user = await isAuthenticated(request);
+    if (user) return redirect("/dashboard");
+    return null;
+  } catch (error) {
+    // If it's a redirect, check for Response-like properties
+    if (
+      error && 
+      typeof error === "object" && 
+      "status" in error && 
+      "headers" in error &&
+      typeof (error as any).status === "number" &&
+      (error as any).status === 302
+    ) {
+      return error;
+    }
+    return errorResponse(error);
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -34,6 +50,17 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   } catch (error) {
     console.error("Login action: authenticator.authenticate error:", error);
+    // If it's a redirect, check for Response-like properties
+    if (
+      error && 
+      typeof error === "object" && 
+      "status" in error && 
+      "headers" in error &&
+      typeof (error as any).status === "number" &&
+      (error as any).status === 302
+    ) {
+      return error;
+    }
     return json({ error: (error as Error).message });
   }
 }

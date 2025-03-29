@@ -13,6 +13,7 @@ import '~/styles/calendar.css';
 
 interface TaskCalendarProps {
   tasks: Task[];
+  recurringTasks?: Task[];
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (taskId: string) => void;
   onToggleComplete?: (taskId: string, completed: boolean) => void;
@@ -22,7 +23,8 @@ interface TaskCalendarProps {
 }
 
 export default function TaskCalendar({
-  tasks,
+  tasks = [],
+  recurringTasks = [],
   onEditTask,
   onDeleteTask,
   onToggleComplete,
@@ -33,8 +35,11 @@ export default function TaskCalendar({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'day'>('month');
 
+  // Combine regular and recurring tasks
+  const allTasks = [...tasks, ...recurringTasks];
+
   // Filter tasks for the selected date
-  const tasksForSelectedDate = tasks.filter(task => {
+  const tasksForSelectedDate = allTasks.filter(task => {
     if (!task.dueDate) return false;
     
     try {
@@ -50,7 +55,7 @@ export default function TaskCalendar({
 
   // Function to check if a date has tasks
   const hasTasksOnDate = (date: Date) => {
-    return tasks.some(task => {
+    return allTasks.some(task => {
       if (!task.dueDate) return false;
       
       try {
@@ -66,7 +71,7 @@ export default function TaskCalendar({
 
   // Get task count for a specific date
   const getTaskCountForDate = (date: Date) => {
-    return tasks.filter(task => {
+    return allTasks.filter(task => {
       if (!task.dueDate) return false;
       
       try {
@@ -238,14 +243,12 @@ export default function TaskCalendar({
         {viewMode === 'month' ? (
           <Card>
             <Calendar
-              onChange={(date) => handleDateClick(date as Date)}
-              value={selectedDate}
-              tileContent={tileContent}
-              tileClassName={tileClassName}
-              prevLabel={<FiChevronLeft />}
-              nextLabel={<FiChevronRight />}
-              prev2Label={null}
-              next2Label={null}
+              tasks={tasks}
+              recurringTasks={recurringTasks}
+              onSelectDate={handleDateClick}
+              onSelectTask={(task) => {
+                if (onTaskClick) onTaskClick(task.id);
+              }}
             />
           </Card>
         ) : (

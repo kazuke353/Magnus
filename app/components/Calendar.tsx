@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isSameDay } from 'date-fns';
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiRepeat } from 'react-icons/fi';
 import { Task } from '~/db/schema';
+import Tooltip from './Tooltip';
 
 interface CalendarProps {
   tasks: Task[];
+  recurringTasks?: Task[];
   onSelectDate: (date: Date) => void;
   onSelectTask: (task: Task) => void;
 }
 
-export default function Calendar({ tasks, onSelectDate, onSelectTask }: CalendarProps) {
+export default function Calendar({ 
+  tasks = [], 
+  recurringTasks = [], 
+  onSelectDate, 
+  onSelectTask 
+}: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const monthStart = startOfMonth(currentMonth);
@@ -35,11 +42,21 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
     });
   };
   
+  // Combine regular and recurring tasks
+  const allTasks = [...tasks, ...recurringTasks];
+  
   const getTasksForDay = (day: Date) => {
-    return tasks.filter(task => {
+    if (!allTasks || !Array.isArray(allTasks)) return [];
+    
+    return allTasks.filter(task => {
       if (!task.dueDate) return false;
-      const taskDate = parseISO(task.dueDate);
-      return isSameDay(taskDate, day);
+      try {
+        const taskDate = parseISO(task.dueDate);
+        return isSameDay(taskDate, day);
+      } catch (error) {
+        console.error("Error parsing date:", error);
+        return false;
+      }
     });
   };
   
@@ -53,12 +70,14 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
           <button
             onClick={prevMonth}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+            aria-label="Previous month"
           >
             <FiChevronLeft className="text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={nextMonth}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+            aria-label="Next month"
           >
             <FiChevronRight className="text-gray-600 dark:text-gray-400" />
           </button>
@@ -79,6 +98,9 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isCurrentDay = isToday(day);
           
+          // Check if there are recurring tasks for this day
+          const hasRecurringTasks = dayTasks.some(task => task.isRecurring || task.recurringPatternId);
+          
           return (
             <div
               key={day.toString()}
@@ -89,10 +111,18 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
                 isCurrentDay ? 'bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20' : ''
               } hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer`}
             >
-              <div className={`text-right ${
-                isCurrentDay ? 'text-blue-600 dark:text-blue-400 font-bold' : ''
-              }`}>
-                {format(day, 'd')}
+              <div className="flex justify-between items-center">
+                <div className={`text-right ${
+                  isCurrentDay ? 'text-blue-600 dark:text-blue-400 font-bold' : ''
+                }`}>
+                  {format(day, 'd')}
+                </div>
+                
+                {hasRecurringTasks && (
+                  <Tooltip content="Contains recurring tasks">
+                    <FiRepeat className="text-purple-500 dark:text-purple-400" size={14} />
+                  </Tooltip>
+                )}
               </div>
               
               <div className="mt-1 space-y-1 max-h-[80px] overflow-y-auto">
@@ -103,7 +133,7 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
                       e.stopPropagation();
                       onSelectTask(task);
                     }}
-                    className={`text-xs p-1 rounded truncate ${
+                    className={`text-xs p-1 rounded truncate flex items-center ${
                       task.completed
                         ? 'bg-green-100 dark:bg-green-900 dark:bg-opacity-20 text-green-800 dark:text-green-300 line-through'
                         : task.priority === 'high'
@@ -113,7 +143,10 @@ export default function Calendar({ tasks, onSelectDate, onSelectTask }: Calendar
                         : 'bg-blue-100 dark:bg-blue-900 dark:bg-opacity-20 text-blue-800 dark:text-blue-300'
                     }`}
                   >
-                    {task.title}
+                    {(task.isRecurring || task.recurringPatternId) && (
+                      <FiRepeat className="mr-1 flex-shrink-0" size={10} />
+                    )}
+                    <span className="truncate">{task.title}</span>
                   </div>
                 ))}
               </div>

@@ -1,12 +1,16 @@
-import { useLoaderData, useActionData, Form, useNavigation } from "@remix-run/react";
+import { useLoaderData, useActionData, Form, useNavigation, useSubmit } from "@remix-run/react";
 import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
 import { updateUserSettings } from "~/db/user.server";
 import Card from "~/components/Card";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
+import { useTheme } from "~/hooks/useTheme";
+import { setTheme as setThemeCookie, Theme } from "~/utils/theme";
+import { getSession, commitSession } from "~/services/session.server";
+import { formatDate } from "~/utils/formatters";
 
 const SettingsSchema = z.object({
   country: z.string().min(1, "Country is required"),
@@ -25,10 +29,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await requireAuthentication(request, "/login");
   
   const formData = await request.formData();
-  const country = formData.get("country") as string;
-  const currency = formData.get("currency") as string;
-  const monthlyBudgetStr = formData.get("monthlyBudget") as string;
-  const theme = formData.get("theme") as string;
+  const country = formData.get("country") as string || '';
+  const currency = formData.get("currency") as string || 'USD';
+  const monthlyBudgetStr = formData.get("monthlyBudget") as string || '0';
+  const themeValue = formData.get("theme");
+  
+  // Ensure theme is a valid string
+  const theme = themeValue && typeof themeValue === 'string' ? themeValue : 'light';
   
   try {
     const monthlyBudget = parseFloat(monthlyBudgetStr);
@@ -42,8 +49,22 @@ export async function action({ request }: ActionFunctionArgs) {
     
     await updateUserSettings(user.id, validatedData);
     
-    return redirect("/settings");
+    // Set theme cookie
+    const session = await getSession(request);
+    const headers = new Headers();
+    
+    // Ensure theme is a valid Theme type
+    const validTheme: Theme = ['light', 'dark', 'system'].includes(theme) 
+      ? theme as Theme 
+      : 'light';
+      
+    headers.append("Set-Cookie", setThemeCookie(validTheme));
+    headers.append("Set-Cookie", await commitSession(session));
+    
+    return redirect("/settings", { headers });
   } catch (error) {
+    console.error("Settings update error:", error);
+    
     if (error instanceof z.ZodError) {
       const fieldErrors = error.flatten().fieldErrors;
       return json({ fieldErrors });
@@ -58,11 +79,44 @@ export default function Settings() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const submit = useSubmit();
   
-  const [country, setCountry] = useState(user.settings.country);
-  const [currency, setCurrency] = useState(user.settings.currency);
-  const [monthlyBudget, setMonthlyBudget] = useState(user.settings.monthlyBudget.toString());
-  const [theme, setTheme] = useState(user.settings.theme || "light");
+  // Ensure we have valid default values
+  const defaultCountry = user.settings?.country || '';
+  const defaultCurrency = user.settings?.currency || 'USD';
+  const defaultMonthlyBudget = user.settings?.monthlyBudget?.toString() || '0';
+  const defaultTheme = user.settings?.theme || 'light';
+  
+  const [country, setCountry] = useState(defaultCountry);
+  const [currency, setCurrency] = useState(defaultCurrency);
+  const [monthlyBudget, setMonthlyBudget] = useState(defaultMonthlyBudget);
+  const [selectedTheme, setSelectedTheme] = useState<Theme>(defaultTheme as Theme);
+  
+  // Use the theme hook to manage theme
+  const { updateTheme } = useTheme(defaultTheme as Theme);
+  
+  // Update theme when selection changes
+  useEffect(() => {
+    updateTheme(selectedTheme);
+  }, [selectedTheme, updateTheme]);
+  
+  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newTheme = e.target.value as Theme;
+    setSelectedTheme(newTheme);
+    
+    // Immediately apply theme change
+    updateTheme(newTheme);
+  };
+  
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.currentTarget);
+    submit(formData, { method: "post" });
+  };
+  
+  // Format the creation date consistently
+  const formattedCreationDate = user.createdAt ? formatDate(user.createdAt) : 'N/A';
   
   return (
     <div className="space-y-6">
@@ -72,7 +126,7 @@ export default function Settings() {
       </div>
       
       <Card title="User Settings">
-        <Form method="post" className="space-y-6">
+        <Form method="post" className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input
               id="country"
@@ -111,8 +165,8 @@ export default function Settings() {
               <select
                 id="theme"
                 name="theme"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
+                value={selectedTheme}
+                onChange={handleThemeChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               >
                 <option value="light">Light</option>
@@ -154,7 +208,7 @@ export default function Settings() {
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Account Created</h3>
             <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-              {new Date(user.createdAt).toLocaleDateString()}
+              {formattedCreationDate}
             </p>
           </div>
         </div>

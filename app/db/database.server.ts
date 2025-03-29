@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
-import { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } from "./schema";
+import { users, tasks, chatMessages, goals, userPortfolios, trading212Pies, recurringPatterns } from "./schema";
 import { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 
 // Define a variable to hold the drizzle instance
@@ -25,7 +25,17 @@ export function getDb() {
     const db = new Database(dbPath);
     db.pragma("foreign_keys = ON");
 
-    drizzleDb = drizzle(db, { schema: { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } });
+    drizzleDb = drizzle(db, { 
+      schema: { 
+        users, 
+        tasks, 
+        chatMessages, 
+        goals, 
+        userPortfolios, 
+        trading212Pies,
+        recurringPatterns 
+      } 
+    });
     
     // Initialize database tables
     initializeDatabase(db);
@@ -36,7 +46,15 @@ export function getDb() {
 
 // Initialize the database with the required tables
 function initializeDatabase(db: Database.Database) {
-  const tables = [users, tasks, chatMessages, goals, userPortfolios, trading212Pies];
+  const tables = [
+    users, 
+    tasks, 
+    chatMessages, 
+    goals, 
+    userPortfolios, 
+    trading212Pies,
+    recurringPatterns
+  ];
 
   // For development only - comment this out in production
   // db.exec("DROP TABLE IF EXISTS users");
@@ -44,6 +62,7 @@ function initializeDatabase(db: Database.Database) {
   for (const table of tables) {
     try {
       const createTableQuery = generateTableSQL(table);
+      console.log(`Creating table if not exists: ${table[Symbol.for("drizzle:Name")]}`);
       db.exec(createTableQuery);
     } catch (error) {
       console.error(`Failed to create table ${table[Symbol.for("drizzle:Name")]}:`, error);

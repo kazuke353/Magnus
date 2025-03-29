@@ -1,14 +1,24 @@
 import { useState, useRef, useEffect } from "react";
-import { FiUpload, FiCopy, FiX, FiCheck, FiAlertTriangle, FiMessageSquare } from "react-icons/fi";
+import { FiUpload, FiCopy, FiX, FiCheck, FiAlertTriangle, FiMessageSquare, FiRepeat, FiInfo } from "react-icons/fi";
 import Button from "./Button";
 import Card from "./Card";
-import { formatDate } from "~/utils/date";
+import { formatDate, formatDateWithDay } from "~/utils/date";
+import Tooltip from "./Tooltip";
 
 interface ImportTasksModalProps {
   onClose: () => void;
   onImport: (tasks: any[]) => void;
   isImporting: boolean;
 }
+
+// Helper function to strip code blocks from imported text
+const stripCodeBlocks = (text: string): string => {
+  if (!text) return "";
+  // This regex removes markdown code blocks and inline code
+  return text.replace(/```(?:[a-zA-Z0-9]*\n)?(.*?)```/gs, "$1")
+            .replace(/`(.*?)`/g, "$1")
+            .trim();
+};
 
 export default function ImportTasksModal({
   onClose,
@@ -62,7 +72,9 @@ export default function ImportTasksModal({
     }
 
     try {
-      const parsedData = JSON.parse(jsonText);
+      // Strip code blocks before parsing
+      const cleanedJson = stripCodeBlocks(jsonText);
+      const parsedData = JSON.parse(cleanedJson);
       
       if (!Array.isArray(parsedData)) {
         throw new Error("Imported data must be an array of tasks");
@@ -72,6 +84,17 @@ export default function ImportTasksModal({
       parsedData.forEach((task, index) => {
         if (!task.title) {
           throw new Error(`Task at index ${index} is missing a title`);
+        }
+        
+        // Validate recurring pattern if present
+        if (task.recurring) {
+          if (!task.recurring.frequency) {
+            throw new Error(`Recurring task at index ${index} is missing a frequency`);
+          }
+          
+          if (!["daily", "weekly", "monthly", "yearly"].includes(task.recurring.frequency)) {
+            throw new Error(`Recurring task at index ${index} has an invalid frequency: ${task.recurring.frequency}`);
+          }
         }
       });
       
@@ -96,11 +119,12 @@ export default function ImportTasksModal({
   // Get current date and format it
   const currentDate = new Date();
   const formattedDate = formatDate(currentDate.toISOString());
+  const formattedDateWithDay = formatDateWithDay(currentDate.toISOString());
   const isoDate = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
 
   const llmPrompt = `I need help organizing my tasks. Please convert the following list of tasks into a structured JSON array that I can import into my task management app.
 
-Today's date is ${formattedDate} (${isoDate}).
+Today's date is ${formattedDateWithDay} (${isoDate}).
 
 For each task, please determine:
 1. A clear title (required)
@@ -110,17 +134,52 @@ For each task, please determine:
 5. A category that makes sense (optional)
 6. An amount if it's a financial task (optional, numeric)
 
+For recurring tasks, please include a "recurring" object with:
+1. "frequency": "daily", "weekly", "monthly", or "yearly" (required)
+2. "interval": number of units between occurrences (default: 1)
+3. "daysOfWeek": comma-separated list of days (1-7, where 1=Monday) for weekly frequency
+4. "dayOfMonth": day of month for monthly/yearly frequency
+5. "monthOfYear": month (1-12) for yearly frequency
+6. "occurrences": number of times to repeat (optional)
+7. "endDate": end date in YYYY-MM-DD format (optional)
+
 Here's the expected JSON structure:
 [
   {
-    "title": "Task name",
+    "title": "One-time task",
     "description": "Detailed description",
     "dueDate": "2023-12-31",
     "priority": "high",
     "category": "work",
     "amount": 100
   },
-  ...
+  {
+    "title": "Pay rent",
+    "description": "Monthly rent payment",
+    "dueDate": "2023-12-01",
+    "priority": "high",
+    "category": "bills",
+    "amount": 1200,
+    "recurring": {
+      "frequency": "monthly",
+      "interval": 1,
+      "dayOfMonth": 1,
+      "occurrences": 12
+    }
+  },
+  {
+    "title": "Team meeting",
+    "description": "Weekly team sync",
+    "dueDate": "2023-12-04",
+    "priority": "medium",
+    "category": "work",
+    "recurring": {
+      "frequency": "weekly",
+      "interval": 1,
+      "daysOfWeek": "1",
+      "endDate": "2024-06-30"
+    }
+  }
 ]
 
 Please organize these tasks intelligently, considering:
@@ -128,6 +187,7 @@ Please organize these tasks intelligently, considering:
 - Group similar tasks into the same category
 - Suggest reasonable due dates based on task complexity and today's date (${isoDate})
 - Add helpful descriptions that clarify the task
+- Identify which tasks should be recurring and set appropriate patterns
 
 Here are my tasks:
 [PASTE YOUR TASKS HERE, ONE PER LINE]
@@ -135,7 +195,7 @@ Here are my tasks:
 Please respond with ONLY the valid JSON array that I can copy directly into my app.`;
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
       <div 
         ref={modalRef}
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform"
@@ -189,27 +249,53 @@ Please respond with ONLY the valid JSON array that I can copy directly into my a
             </div>
           </div>
 
-          <div>
-            <label htmlFor="json-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <div className="flex items-center space-x-2 mb-1">
+            <label htmlFor="json-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Paste JSON Task Data
             </label>
-            <textarea
-              id="json-input"
-              ref={textAreaRef}
-              className="w-full h-64 p-3 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
-              placeholder='[
+            <Tooltip content="You can import both regular and recurring tasks. For recurring tasks, include a 'recurring' object with frequency details.">
+              <span className="text-gray-500 cursor-help">
+                <FiInfo size={16} />
+              </span>
+            </Tooltip>
+          </div>
+          <textarea
+            id="json-input"
+            ref={textAreaRef}
+            className="w-full h-64 p-3 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
+            placeholder='[
   {
-    "title": "Task name",
+    "title": "One-time task",
     "description": "Detailed description",
     "dueDate": "2023-12-31",
     "priority": "high",
-    "category": "work",
-    "amount": 100
+    "category": "work"
+  },
+  {
+    "title": "Pay rent",
+    "description": "Monthly rent payment",
+    "dueDate": "2023-12-01",
+    "priority": "high",
+    "category": "bills",
+    "amount": 1200,
+    "recurring": {
+      "frequency": "monthly",
+      "interval": 1,
+      "dayOfMonth": 1
+    }
   }
 ]'
-              value={jsonText}
-              onChange={handleTextChange}
-            />
+            value={jsonText}
+            onChange={handleTextChange}
+          />
+
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-3 rounded-md">
+            <div className="flex">
+              <FiRepeat className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                <strong>Recurring Tasks:</strong> To import recurring tasks, include a "recurring" object with "frequency" (daily/weekly/monthly/yearly), "interval", and other relevant properties.
+              </p>
+            </div>
           </div>
 
           {parseError && (

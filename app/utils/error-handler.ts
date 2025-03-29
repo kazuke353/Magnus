@@ -33,7 +33,23 @@ export function createError(
   };
 }
 
-export function handleError(error: unknown): AppError {
+export function handleError(error: unknown) {
+  // First, check if this is a Response object (like a redirect)
+  // Instead of using instanceof, check for Response properties
+  if (
+    error && 
+    typeof error === "object" && 
+    "status" in error && 
+    "headers" in error &&
+    typeof (error as any).status === "number" &&
+    typeof (error as any).headers === "object"
+  ) {
+    // Don't treat redirects or other Response objects as errors
+    // Just return them directly
+    return error;
+  }
+  
+  // Log the error for debugging, but don't log redirects
   console.error("Error occurred:", error);
   
   // Handle known error types
@@ -60,10 +76,25 @@ export function handleError(error: unknown): AppError {
 }
 
 export function errorResponse(error: unknown) {
-  const appError = handleError(error);
+  const result = handleError(error);
+  
+  // If it's already a Response (like a redirect), just return it
+  // Check for Response-like properties instead of using instanceof
+  if (
+    result && 
+    typeof result === "object" && 
+    "status" in result && 
+    "headers" in result &&
+    typeof (result as any).status === "number" &&
+    typeof (result as any).headers === "object"
+  ) {
+    return result;
+  }
+  
+  // Otherwise, it's an AppError, so create a JSON response
   return json(
-    { error: appError },
-    { status: appError.status }
+    { error: result },
+    { status: (result as AppError).status }
   );
 }
 

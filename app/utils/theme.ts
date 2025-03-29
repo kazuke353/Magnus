@@ -9,7 +9,12 @@ export function getTheme(request: Request): Theme {
 
 // Set theme in cookie
 export function setTheme(theme: Theme): string {
-  return `theme=${theme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  // Ensure theme is a valid string value
+  const validTheme: Theme = theme && ['light', 'dark', 'system'].includes(theme) 
+    ? theme 
+    : 'light';
+    
+  return `theme=${validTheme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
 // Helper function to parse cookies
@@ -29,6 +34,8 @@ function parseCookies(cookieHeader: string): Record<string, string> {
 }
 
 export function getThemeClass(theme: Theme): string {
+  if (!theme) return 'light'; // Default to light if theme is undefined
+  
   if (theme === 'dark') return 'dark';
   if (theme === 'light') return 'light';
   
@@ -51,4 +58,33 @@ export function getThemeFromClass(): Theme {
   if (isLight) return 'light';
   
   return 'system';
+}
+
+// Apply theme class to document
+export function applyTheme(theme: Theme): void {
+  if (typeof document === 'undefined') return;
+  
+  // Ensure theme is a valid value
+  const validTheme: Theme = theme && ['light', 'dark', 'system'].includes(theme) 
+    ? theme 
+    : 'light';
+    
+  const themeClass = getThemeClass(validTheme);
+  
+  // Remove existing theme classes
+  document.documentElement.classList.remove('light', 'dark');
+  
+  // Add the appropriate theme class
+  document.documentElement.classList.add(themeClass);
+  
+  // Update color-scheme meta tag
+  const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+  if (metaColorScheme) {
+    metaColorScheme.setAttribute('content', themeClass);
+  } else {
+    const meta = document.createElement('meta');
+    meta.name = 'color-scheme';
+    meta.content = themeClass;
+    document.head.appendChild(meta);
+  }
 }

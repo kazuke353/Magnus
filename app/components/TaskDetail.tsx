@@ -3,6 +3,7 @@ import { Task } from '~/db/schema';
 import Button from './Button';
 import { FiEdit2, FiTrash2, FiCheck, FiX, FiCalendar, FiDollarSign, FiTag, FiFlag } from 'react-icons/fi';
 import { formatCurrency } from '~/utils/formatters';
+import ReactMarkdown from 'react-markdown';
 
 interface TaskDetailProps {
   task: Task;
@@ -28,7 +29,7 @@ export default function TaskDetail({
   };
   
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sticky top-4">
       <div className="flex justify-between items-start mb-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">
           {task.title}
@@ -45,7 +46,9 @@ export default function TaskDetail({
         {task.description && (
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
-            <p className="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-line">{task.description}</p>
+            <div className="mt-1 prose prose-sm dark:prose-invert max-w-none text-gray-900 dark:text-gray-100">
+              <ReactMarkdown>{task.description}</ReactMarkdown>
+            </div>
           </div>
         )}
         
@@ -56,7 +59,7 @@ export default function TaskDetail({
               <div>
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</h3>
                 <p className="mt-1 text-gray-900 dark:text-gray-100">
-                  {format(new Date(task.dueDate), 'PPP')}
+                  {format(new Date(task.dueDate), 'EEEE, MMMM d, yyyy')}
                 </p>
               </div>
             </div>

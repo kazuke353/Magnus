@@ -18,6 +18,49 @@ export function formatDate(dateString: string): string {
 }
 
 /**
+ * Format a date with day name for display
+ * @param dateString ISO date string
+ * @returns Formatted date string (e.g., "Mon, Jan 1, 2023")
+ */
+export function formatDateWithDay(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date with day:', error);
+    return dateString;
+  }
+}
+
+/**
+ * Formats a date string to a localized date and time format
+ * @param dateString - ISO date string
+ * @returns Formatted date and time string
+ */
+export function formatDateTime(dateString: string): string {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  } catch (error) {
+    console.error("Error formatting date time:", error);
+    return dateString;
+  }
+}
+
+/**
  * Format a date for input[type="date"]
  * @param dateString ISO date string
  * @returns Formatted date string (YYYY-MM-DD)
@@ -99,5 +142,22 @@ export function getDaysDifference(dateString1: string, dateString2?: string): nu
   } catch (error) {
     console.error('Error calculating days difference:', error);
     return 0;
+  }
+}
+
+/**
+ * Ensure consistent date formatting between server and client
+ * This is a helper function to fix hydration mismatches
+ * @param date Date object or date string
+ * @param locale Locale to use for formatting (default: 'en-US')
+ * @returns Formatted date string
+ */
+export function getConsistentDateFormat(date: Date | string, locale: string = 'en-US'): string {
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString(locale);
+  } catch (error) {
+    console.error('Error formatting date consistently:', error);
+    return typeof date === 'string' ? date : date.toString();
   }
 }

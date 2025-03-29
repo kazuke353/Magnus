@@ -25,6 +25,25 @@ export const tasks = sqliteTable("tasks", {
   priority: text("priority").notNull().default("medium"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  // Recurring task fields
+  isRecurring: integer("is_recurring", { mode: "boolean" }).notNull().default(false),
+  recurringPatternId: text("recurring_pattern_id").references(() => recurringPatterns.id),
+  parentTaskId: text("parent_task_id").references(() => tasks.id),
+});
+
+// Recurring patterns table
+export const recurringPatterns = sqliteTable("recurring_patterns", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  frequency: text("frequency").notNull(), // daily, weekly, monthly, yearly
+  interval: integer("interval").notNull().default(1), // every X days/weeks/months/years
+  daysOfWeek: text("days_of_week"), // For weekly: "1,2,3" (Mon,Tue,Wed)
+  dayOfMonth: integer("day_of_month"), // For monthly: 1-31
+  monthOfYear: integer("month_of_year"), // For yearly: 1-12
+  endDate: text("end_date"), // Optional end date
+  occurrences: integer("occurrences"), // Optional number of occurrences
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });
 
 // Chat messages table
@@ -102,6 +121,25 @@ export interface Task {
   amount: number | null;
   category: string | undefined;
   priority: "low" | "medium" | "high";
+  createdAt: string;
+  updatedAt: string;
+  // Recurring task fields
+  isRecurring: boolean;
+  recurringPatternId: string | null;
+  parentTaskId: string | null;
+}
+
+// Recurring pattern type
+export interface RecurringPattern {
+  id: string;
+  userId: string;
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  interval: number;
+  daysOfWeek: string | null; // Comma-separated days (1-7, where 1 is Monday)
+  dayOfMonth: number | null; // 1-31
+  monthOfYear: number | null; // 1-12
+  endDate: string | null;
+  occurrences: number | null;
   createdAt: string;
   updatedAt: string;
 }

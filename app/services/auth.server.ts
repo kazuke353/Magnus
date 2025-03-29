@@ -5,6 +5,7 @@ import { sessionStorage, getUser as getSessionUser, setUserSession } from "~/ser
 import { verifyLogin, getUserById } from "~/db/user.server";
 import { User } from "~/db/schema";
 import { redirect } from "@remix-run/node";
+import { createAuthenticationError } from "~/utils/error-handler";
 
 // Define an interface for what's stored in the session
 interface SessionData {
@@ -22,7 +23,7 @@ authenticator.use(
 
     const user = await verifyLogin(email, password);
     if (!user) {
-      throw new Error("Invalid email or password");
+      throw createAuthenticationError("Invalid email or password");
     }
 
     console.log("FormStrategy: Authentication successful in strategy.");

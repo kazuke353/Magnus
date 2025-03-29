@@ -10,8 +10,9 @@ import {
 // LiveReload, <LiveReload />` is obsolete when using Vite and can conflict with Vite's built-in HMR runtime.
 } from "@remix-run/react";
 import { getUser } from "~/services/session.server";
-import { getTheme, setTheme } from "~/utils/theme";
+import { getTheme, getThemeClass } from "~/utils/theme";
 import { useEffect } from "react";
+import { useTheme } from "~/hooks/useTheme";
 
 const tailwindStylesheetUrl = "./app/styles/tailwind.css";
 const calendarStylesheetUrl = "./app/styles/calendar.css";
@@ -31,23 +32,37 @@ export const links: LinksFunction = () => [
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getUser(request);
   const theme = getTheme(request);
-  return json({ user, theme });
+  
+  // Set default locale for consistent date formatting
+  const locale = user?.settings?.locale || 'en-US';
+  
+  return json({ 
+    user, 
+    theme,
+    locale
+  });
 };
 
 export default function App() {
-  const { theme } = useLoaderData<typeof loader>();
-
+  const { theme: serverTheme } = useLoaderData<typeof loader>();
+  const { theme, updateTheme } = useTheme(serverTheme);
+  
+  // Get the actual CSS class to apply based on the theme
+  const themeClass = getThemeClass(theme);
+  
+  // Apply theme on initial load
   useEffect(() => {
-    if (theme) {
-      document.documentElement.classList.toggle("dark", theme === "dark");
+    if (serverTheme) {
+      updateTheme(serverTheme);
     }
-  }, [theme]);
+  }, [serverTheme, updateTheme]);
 
   return (
-    <html lang="en" className={theme === "dark" ? "dark h-full" : "light h-full"}>
+    <html lang="en" className={`${themeClass} h-full`}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta name="color-scheme" content={themeClass} />
         <Meta />
         <Links />
       </head>

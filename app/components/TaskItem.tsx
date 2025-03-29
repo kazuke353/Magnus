@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { FiEdit2, FiTrash2, FiDollarSign, FiCalendar, FiChevronDown, FiChevronUp, FiCheck } from "react-icons/fi";
 import { Task } from "~/db/schema";
-import { formatDate, formatCurrency } from "~/utils/formatters";
+import { formatDate, formatDateWithDay, formatCurrency } from "~/utils/formatters";
 import Button from "./Button";
+import ReactMarkdown from "react-markdown";
 
 interface TaskItemProps {
   task: Task;
@@ -48,13 +49,13 @@ export default function TaskItem({
   
   const handleToggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleComplete(task.id, !task.completed);
+    onToggleComplete(task.id, task.completed);
   };
   
   return (
     <div 
-      className={`border border-gray-200 dark:border-gray-700 rounded-lg mb-4 overflow-hidden transition-all duration-200 ${
-        isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''
+      className={`border border-gray-200 dark:border-gray-700 rounded-lg mb-4 overflow-hidden transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 ${
+        isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 border-blue-400 dark:border-blue-500' : ''
       } ${
         onSelect ? 'cursor-pointer hover:shadow-md' : ''
       }`}
@@ -69,7 +70,7 @@ export default function TaskItem({
                 task.completed 
                   ? 'bg-blue-500 border-blue-500 text-white' 
                   : 'border-gray-300 dark:border-gray-600'
-              }`}
+              } hover:border-blue-400 dark:hover:border-blue-500 transition-colors`}
               aria-label={`Mark task "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
             >
               {task.completed && <FiCheck className="h-3 w-3" />}
@@ -110,7 +111,7 @@ export default function TaskItem({
                 {task.dueDate && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:bg-opacity-30 dark:text-purple-300">
                     <FiCalendar className="mr-1" />
-                    {formatDate(task.dueDate)}
+                    {formatDateWithDay(task.dueDate)}
                   </span>
                 )}
                 
@@ -147,8 +148,10 @@ export default function TaskItem({
         </div>
         
         {isExpanded && task.description && (
-          <div className="mt-4 pl-8 pr-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-md">
-            <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">{task.description}</p>
+          <div className="mt-4 pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+            <div className="prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300">
+              <ReactMarkdown>{task.description}</ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
