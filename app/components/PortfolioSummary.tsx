@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import Card from "~/components/Card";
 import { FiDollarSign, FiTrendingUp, FiTrendingDown, FiCalendar } from "react-icons/fi";
-import { formatCurrency, formatDateTime } from "~/utils/formatters";
+import { formatCurrency, formatDate } from "~/utils/formatters";
 
 interface PortfolioSummaryProps {
   totalInvested: number;
@@ -96,7 +96,7 @@ export default function PortfolioSummary({
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">LAST UPDATED</h3>
                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1" title={fetchDate}>
-                  {formatDateTime(fetchDate)}
+                  {formatDate(fetchDate)}
                 </p>
               </div>
             </div>
