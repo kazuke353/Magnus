@@ -1,4 +1,5 @@
 {
+  "name": "magnus",
   "private": true,
   "sideEffects": false,
   "type": "module",
