@@ -57,8 +57,8 @@ Magnus is a comprehensive personal finance management application designed to he
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
-    cd <repository-folder>
+    git clone https://github.com/kazuke353/Magnus
+    cd Magnus
     ```
 2.  **Install dependencies:**
     ```bash
@@ -72,7 +72,7 @@ Magnus is a comprehensive personal finance management application designed to he
         API_KEY="YOUR_TRADING_212_API_KEY"
         ```
 4.  **Database Setup:** The SQLite database (`magnus.db`) will be automatically created in the `./data/` directory on the first run if it doesn't exist.
-5.  **(Optional) Chat Backend:** This application interacts with a separate backend (likely FastAPI) for chat functionality. Ensure that backend server is running (typically on `http://localhost:8000` or `http://127.0.0.1:8000` based on the code).
+5.  **(Optional) Chat Backend:** This application interacts with a separate backend (using FastAPI) for chat functionality. Ensure that backend server is running (typically on `http://localhost:8000` or `http://127.0.0.1:8000` based on the code).
 
 ## Running the App
 
