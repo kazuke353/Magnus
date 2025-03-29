@@ -1,26 +1,34 @@
 import { useState } from 'react';
 import Calendar from './Calendar'
-import { format, isEqual, parseISO, isValid } from 'date-fns';
+import { format, isEqual, parseISO, isValid, isSameDay } from 'date-fns';
 import { Task } from '~/db/schema';
 import Card from './Card';
 import TaskItem from './TaskItem';
-import { FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiPlus } from 'react-icons/fi';
+import Button from './Button';
+import EmptyState from './EmptyState';
 
 // Import calendar styles
 import '~/styles/calendar.css';
 
 interface TaskCalendarProps {
   tasks: Task[];
-  onEditTask: (task: Task) => void;
-  onDeleteTask: (taskId: string) => void;
-  onToggleComplete: (taskId: string, completed: boolean) => void;
+  onEditTask?: (task: Task) => void;
+  onDeleteTask?: (taskId: string) => void;
+  onToggleComplete?: (taskId: string, completed: boolean) => void;
+  onTaskClick?: (taskId: string) => void;
+  onDateClick?: (date: Date) => void;
+  currency?: string;
 }
 
 export default function TaskCalendar({
   tasks,
   onEditTask,
   onDeleteTask,
-  onToggleComplete
+  onToggleComplete,
+  onTaskClick,
+  onDateClick,
+  currency = "$"
 }: TaskCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'day'>('month');
@@ -33,10 +41,7 @@ export default function TaskCalendar({
       const taskDate = parseISO(task.dueDate);
       if (!isValid(taskDate)) return false;
       
-      return isEqual(
-        new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate()),
-        new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
-      );
+      return isSameDay(taskDate, selectedDate);
     } catch (error) {
       console.error("Error parsing date:", error);
       return false;
@@ -52,24 +57,42 @@ export default function TaskCalendar({
         const taskDate = parseISO(task.dueDate);
         if (!isValid(taskDate)) return false;
         
-        return isEqual(
-          new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate()),
-          new Date(date.getFullYear(), date.getMonth(), date.getDate())
-        );
+        return isSameDay(taskDate, date);
       } catch (error) {
         return false;
       }
     });
   };
 
+  // Get task count for a specific date
+  const getTaskCountForDate = (date: Date) => {
+    return tasks.filter(task => {
+      if (!task.dueDate) return false;
+      
+      try {
+        const taskDate = parseISO(task.dueDate);
+        if (!isValid(taskDate)) return false;
+        
+        return isSameDay(taskDate, date);
+      } catch (error) {
+        return false;
+      }
+    }).length;
+  };
+
   // Custom tile content to show indicators for dates with tasks
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
-    if (view === 'month' && hasTasksOnDate(date)) {
-      return (
-        <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-          <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-        </div>
-      );
+    if (view === 'month') {
+      const taskCount = getTaskCountForDate(date);
+      if (taskCount > 0) {
+        return (
+          <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+            <div className="text-xs font-medium text-blue-600 dark:text-blue-400">
+              {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+            </div>
+          </div>
+        );
+      }
     }
     return null;
   };
@@ -77,7 +100,7 @@ export default function TaskCalendar({
   // Custom class for tiles
   const tileClassName = ({ date, view }: { date: Date; view: string }) => {
     if (view === 'month') {
-      const classes = ['relative', 'h-12'];
+      const classes = ['relative', 'h-16'];
       
       if (hasTasksOnDate(date)) {
         classes.push('font-medium');
@@ -88,6 +111,20 @@ export default function TaskCalendar({
     return '';
   };
 
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date);
+    setViewMode('day');
+    if (onDateClick) {
+      onDateClick(date);
+    }
+  };
+
+  const handleAddTaskForDate = () => {
+    if (onDateClick) {
+      onDateClick(selectedDate);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
@@ -96,14 +133,28 @@ export default function TaskCalendar({
           {viewMode === 'month' ? 'Monthly View' : format(selectedDate, 'MMMM d, yyyy')}
         </h2>
         
-        {viewMode === 'day' && (
-          <button
-            onClick={() => setViewMode('month')}
-            className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-          >
-            Back to Month
-          </button>
-        )}
+        <div className="flex space-x-2">
+          {viewMode === 'day' && (
+            <Button
+              variant="outline"
+              onClick={() => setViewMode('month')}
+              size="sm"
+            >
+              Back to Month
+            </Button>
+          )}
+          
+          {viewMode === 'day' && onDateClick && (
+            <Button
+              variant="primary"
+              onClick={handleAddTaskForDate}
+              size="sm"
+            >
+              <FiPlus className="mr-1" />
+              Add Task
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="calendar-container">
@@ -117,6 +168,7 @@ export default function TaskCalendar({
           .react-calendar__tile {
             padding: 0.75em 0.5em;
             position: relative;
+            height: 80px;
           }
           .react-calendar__tile--now {
             background: rgba(59, 130, 246, 0.1);
@@ -186,10 +238,7 @@ export default function TaskCalendar({
         {viewMode === 'month' ? (
           <Card>
             <Calendar
-              onChange={(date) => {
-                setSelectedDate(date as Date);
-                setViewMode('day');
-              }}
+              onChange={(date) => handleDateClick(date as Date)}
               value={selectedDate}
               tileContent={tileContent}
               tileClassName={tileClassName}
@@ -208,16 +257,22 @@ export default function TaskCalendar({
                     <TaskItem
                       key={task.id}
                       task={task}
-                      onEdit={onEditTask}
-                      onDelete={onDeleteTask}
-                      onToggleComplete={onToggleComplete}
+                      onEdit={onEditTask || (() => {})}
+                      onDelete={onDeleteTask || (() => {})}
+                      onToggleComplete={onToggleComplete || (() => {})}
+                      onSelect={onTaskClick ? () => onTaskClick(task.id) : undefined}
+                      currency={currency}
                     />
                   ))}
                 </div>
               ) : (
-                <div className="py-6 text-center text-gray-500 dark:text-gray-400">
-                  No tasks scheduled for this date.
-                </div>
+                <EmptyState
+                  icon={<FiCalendar className="h-12 w-12" />}
+                  title="No tasks scheduled"
+                  description="No tasks scheduled for this date. Add a task to get started."
+                  actionLabel={onDateClick ? "Add Task" : undefined}
+                  onAction={onDateClick ? handleAddTaskForDate : undefined}
+                />
               )}
             </Card>
           </div>

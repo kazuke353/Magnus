@@ -1,7 +1,8 @@
 import { format } from 'date-fns';
 import { Task } from '~/db/schema';
 import Button from './Button';
-import { FiEdit, FiTrash2, FiCheck, FiX } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiCheck, FiX, FiCalendar, FiDollarSign, FiTag, FiFlag } from 'react-icons/fi';
+import { formatCurrency } from '~/utils/formatters';
 
 interface TaskDetailProps {
   task: Task;
@@ -9,6 +10,7 @@ interface TaskDetailProps {
   onDelete: (taskId: string) => void;
   onToggleComplete: (taskId: string, completed: boolean) => void;
   onClose: () => void;
+  currency?: string;
 }
 
 export default function TaskDetail({
@@ -16,10 +18,11 @@ export default function TaskDetail({
   onEdit,
   onDelete,
   onToggleComplete,
-  onClose
+  onClose,
+  currency = "$"
 }: TaskDetailProps) {
   const priorityColors = {
-    low: 'bg-blue-100 dark:bg-blue-900 dark:bg-opacity-20 text-blue-800 dark:text-blue-300',
+    low: 'bg-green-100 dark:bg-green-900 dark:bg-opacity-20 text-green-800 dark:text-green-300',
     medium: 'bg-yellow-100 dark:bg-yellow-900 dark:bg-opacity-20 text-yellow-800 dark:text-yellow-300',
     high: 'bg-red-100 dark:bg-red-900 dark:bg-opacity-20 text-red-800 dark:text-red-300'
   };
@@ -42,44 +45,56 @@ export default function TaskDetail({
         {task.description && (
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
-            <p className="mt-1 text-gray-900 dark:text-gray-100">{task.description}</p>
+            <p className="mt-1 text-gray-900 dark:text-gray-100 whitespace-pre-line">{task.description}</p>
           </div>
         )}
         
         <div className="grid grid-cols-2 gap-4">
           {task.dueDate && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</h3>
-              <p className="mt-1 text-gray-900 dark:text-gray-100">
-                {format(new Date(task.dueDate), 'PPP')}
-              </p>
+            <div className="flex items-start">
+              <FiCalendar className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</h3>
+                <p className="mt-1 text-gray-900 dark:text-gray-100">
+                  {format(new Date(task.dueDate), 'PPP')}
+                </p>
+              </div>
             </div>
           )}
           
           {task.category && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Category</h3>
-              <p className="mt-1 text-gray-900 dark:text-gray-100">{task.category}</p>
+            <div className="flex items-start">
+              <FiTag className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Category</h3>
+                <p className="mt-1 text-gray-900 dark:text-gray-100">{task.category}</p>
+              </div>
             </div>
           )}
           
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Priority</h3>
-            <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${priorityColors[task.priority]}`}>
-              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-            </span>
+          <div className="flex items-start">
+            <FiFlag className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Priority</h3>
+              <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${priorityColors[task.priority]}`}>
+                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+              </span>
+            </div>
           </div>
           
           {task.amount !== null && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</h3>
-              <p className="mt-1 text-gray-900 dark:text-gray-100">
-                ${task.amount.toFixed(2)}
-              </p>
+            <div className="flex items-start">
+              <FiDollarSign className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</h3>
+                <p className="mt-1 text-gray-900 dark:text-gray-100">
+                  {formatCurrency(task.amount, currency)}
+                </p>
+              </div>
             </div>
           )}
           
-          <div>
+          <div className="col-span-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
             <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${
               task.completed
@@ -114,7 +129,7 @@ export default function TaskDetail({
           variant="outline"
           onClick={() => onEdit(task)}
         >
-          <FiEdit className="mr-2" />
+          <FiEdit2 className="mr-2" />
           Edit
         </Button>
         

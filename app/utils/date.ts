@@ -1,44 +1,103 @@
-import { format, parseISO, isValid } from 'date-fns';
-
-export function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  
+/**
+ * Format a date for display
+ * @param dateString ISO date string
+ * @returns Formatted date string (e.g., "Jan 1, 2023")
+ */
+export function formatDate(dateString: string): string {
   try {
-    const date = parseISO(dateString);
-    if (!isValid(date)) return '';
-    
-    return format(date, 'MMM d, yyyy');
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
   } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
+}
+
+/**
+ * Format a date for input[type="date"]
+ * @param dateString ISO date string
+ * @returns Formatted date string (YYYY-MM-DD)
+ */
+export function formatDateForInput(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error('Error formatting date for input:', error);
     return '';
   }
 }
 
-export function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  
-  try {
-    const date = parseISO(dateString);
-    if (!isValid(date)) return '';
-    
-    return format(date, 'MMM d, yyyy h:mm a');
-  } catch (error) {
-    return '';
-  }
-}
-
-export function formatDateForInput(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  
-  try {
-    const date = parseISO(dateString);
-    if (!isValid(date)) return '';
-    
-    return format(date, 'yyyy-MM-dd');
-  } catch (error) {
-    return '';
-  }
-}
-
+/**
+ * Get the current date formatted for input[type="date"]
+ * @returns Current date formatted as YYYY-MM-DD
+ */
 export function getCurrentDateForInput(): string {
-  return format(new Date(), 'yyyy-MM-dd');
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Check if a date is today
+ * @param dateString ISO date string
+ * @returns Boolean indicating if the date is today
+ */
+export function isToday(dateString: string): boolean {
+  try {
+    const date = new Date(dateString);
+    const today = new Date();
+    
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  } catch (error) {
+    console.error('Error checking if date is today:', error);
+    return false;
+  }
+}
+
+/**
+ * Check if a date is in the past
+ * @param dateString ISO date string
+ * @returns Boolean indicating if the date is in the past
+ */
+export function isPast(dateString: string): boolean {
+  try {
+    const date = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return date < today;
+  } catch (error) {
+    console.error('Error checking if date is in the past:', error);
+    return false;
+  }
+}
+
+/**
+ * Get the difference in days between two dates
+ * @param dateString1 First ISO date string
+ * @param dateString2 Second ISO date string (defaults to today)
+ * @returns Number of days between the dates
+ */
+export function getDaysDifference(dateString1: string, dateString2?: string): number {
+  try {
+    const date1 = new Date(dateString1);
+    const date2 = dateString2 ? new Date(dateString2) : new Date();
+    
+    // Set both dates to midnight to get accurate day difference
+    date1.setHours(0, 0, 0, 0);
+    date2.setHours(0, 0, 0, 0);
+    
+    const diffTime = Math.abs(date2.getTime() - date1.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  } catch (error) {
+    console.error('Error calculating days difference:', error);
+    return 0;
+  }
 }

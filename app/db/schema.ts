@@ -22,6 +22,7 @@ export const tasks = sqliteTable("tasks", {
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
   amount: real("amount"),
   category: text("category"),
+  priority: text("priority").notNull().default("medium"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -88,4 +89,34 @@ export interface User {
     monthlyBudget?: number;
     country?: string;
   };
+}
+
+// Task type
+export interface Task {
+  id: string;
+  userId: string;
+  title: string;
+  description: string | null;
+  dueDate: string | undefined;
+  completed: boolean;
+  amount: number | null;
+  category: string | undefined;
+  priority: "low" | "medium" | "high";
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Goal type
+export interface Goal {
+  id: string;
+  userId: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  monthlyContribution: number;
+  expectedReturn: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
 }

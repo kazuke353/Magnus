@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { PerformanceMetrics } from '~/utils/portfolio_fetcher';
 import Button from './Button';
 import { FiX, FiArrowRight, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
@@ -16,6 +16,35 @@ export default function RebalanceModal({
   currency = 'BGN'
 }: RebalanceModalProps) {
   const [rebalanceAmount, setRebalanceAmount] = useState<number>(0);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [onClose]);
 
   // Calculate rebalance suggestions
   const rebalanceSuggestions = useMemo(() => {
@@ -82,13 +111,16 @@ export default function RebalanceModal({
   }, [portfolioData, rebalanceAmount]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
+      <div 
+        ref={modalRef}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform"
+      >
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Portfolio Rebalance Suggestions</h2>
           <button 
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <FiX size={24} />
           </button>
@@ -132,8 +164,8 @@ export default function RebalanceModal({
                     key={index} 
                     className={`p-4 rounded-lg border ${
                       suggestion.action === 'Buy' 
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900 dark:bg-opacity-20' 
-                        : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900 dark:bg-opacity-20'
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' 
+                        : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">

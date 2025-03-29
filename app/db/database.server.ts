@@ -6,28 +6,53 @@ import path from "path";
 import { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } from "./schema";
 import { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 
-let db: Database.Database;
+// Define a variable to hold the drizzle instance
 let drizzleDb: ReturnType<typeof drizzle>;
 
-function getDb() {
-  if (!db) {
+// Initialize the database and return the drizzle instance
+export function getDb() {
+  if (!drizzleDb) {
     const dbPath = path.resolve("./data/magnus.db");
     const dataDir = path.dirname(dbPath);
+    
+    // Create data directory if it doesn't exist
     if (!fs.existsSync(dataDir)) {
       console.log("Creating data directory:", dataDir);
       fs.mkdirSync(dataDir, { recursive: true });
     }
 
     console.log("Initializing database at:", dbPath);
-    db = new Database(dbPath);
+    const db = new Database(dbPath);
     db.pragma("foreign_keys = ON");
 
     drizzleDb = drizzle(db, { schema: { users, tasks, chatMessages, goals, userPortfolios, trading212Pies } });
-    initializeDatabase();
+    
+    // Initialize database tables
+    initializeDatabase(db);
   }
+  
   return drizzleDb;
 }
 
+// Initialize the database with the required tables
+function initializeDatabase(db: Database.Database) {
+  const tables = [users, tasks, chatMessages, goals, userPortfolios, trading212Pies];
+
+  // For development only - comment this out in production
+  // db.exec("DROP TABLE IF EXISTS users");
+
+  for (const table of tables) {
+    try {
+      const createTableQuery = generateTableSQL(table);
+      db.exec(createTableQuery);
+    } catch (error) {
+      console.error(`Failed to create table ${table[Symbol.for("drizzle:Name")]}:`, error);
+      throw error;
+    }
+  }
+}
+
+// Generate SQL for creating a table
 function generateTableSQL(table: SQLiteTable) {
   const tableName = table[Symbol.for("drizzle:Name")];
   const columns = Object.entries(table).filter(([key]) => key !== "sqliteTable") as [string, SQLiteColumn][];
@@ -61,21 +86,5 @@ function generateTableSQL(table: SQLiteTable) {
   return `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs})`;
 }
 
-function initializeDatabase() {
-  const tables = [users, tasks, chatMessages, goals, userPortfolios, trading212Pies];
-
-  // Drop existing tables (for development/testing; remove in production)
-  db.exec("DROP TABLE IF EXISTS users");
-
-  for (const table of tables) {
-    try {
-      const createTableQuery = generateTableSQL(table);
-      db.exec(createTableQuery);
-    } catch (error) {
-      console.error(`Failed to create table ${table[Symbol.for("drizzle:Name")]}:`, error);
-      throw error;
-    }
-  }
-}
-
-export { getDb };
+// Initialize the database immediately to ensure it's ready when needed
+export const db = getDb();

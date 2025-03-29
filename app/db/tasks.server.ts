@@ -1,128 +1,143 @@
-import { getDb } from './database.server';
-import { Task, tasks } from './schema';
-import { v4 as uuidv4 } from 'uuid';
-import { eq, and, gte, lte, asc, desc } from 'drizzle-orm';
+import { db } from "./database.server";
+import { tasks, Task } from "./schema";
+import { eq } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 
-// Utility type for omitting properties (since `Omit` is built into TypeScript)
-type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
-
-export async function createTask(
-  userId: string,
-  taskData: Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed'>
-): Promise<Task> {
-  const db = getDb();
-  const now = new Date().toISOString();
-  const id = uuidv4();
-
+export async function getUserTasks(userId: string): Promise<Task[]> {
   try {
-    await db.insert(tasks).values({
-      id,
-      userId,
-      title: taskData.title,
-      description: taskData.description || null,
-      dueDate: taskData.dueDate || null,
-      completed: false, // Default to false as per schema
-      category: taskData.category || null,
-      amount: taskData.amount || null,
-      createdAt: now,
-      updatedAt: now
-    });
+    return await db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(tasks.createdAt);
+  } catch (error) {
+    console.error("Error in getUserTasks:", error);
+    return [];
+  }
+}
 
-    const newTask = await getTaskById(id);
-    if (!newTask) {
-      throw new Error('Task not found after creation');
-    }
+export async function getTaskById(id: string): Promise<Task | undefined> {
+  try {
+    const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.error("Error in getTaskById:", error);
+    return undefined;
+  }
+}
+
+export async function createTask(taskData: Omit<Task, "id" | "createdAt" | "updatedAt">): Promise<Task> {
+  const id = uuidv4();
+  const now = new Date();
+  
+  // Convert Date objects to ISO strings for SQLite compatibility
+  const newTask: Task = {
+    id,
+    ...taskData,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+  
+  try {
+    await db.insert(tasks).values(newTask);
     return newTask;
   } catch (error) {
     console.error("Error in createTask:", error);
-    throw error;
+    throw new Error(`Failed to create task: ${error.message}`);
   }
 }
 
-export async function getTaskById(id: string): Promise<Task> {
-  const db = getDb();
+export async function createBulkTasks(
+  userId: string,
+  titles: string[],
+  defaults: {
+    dueDate?: string;
+    category?: string;
+    priority: "low" | "medium" | "high";
+    amount?: number | null;
+  }
+): Promise<Task[]> {
+  const now = new Date();
+  const nowISOString = now.toISOString(); // Convert to string for SQLite compatibility
+  const createdTasks: Task[] = [];
+  
   try {
-    const result = await db.select()
-      .from(tasks)
-      .where(eq(tasks.id, id))
-      .limit(1);
+    for (const title of titles) {
+      if (!title.trim()) continue;
+      
+      const id = uuidv4();
+      
+      const newTask: Task = {
+        id,
+        userId,
+        title: title.trim(),
+        description: "",
+        dueDate: defaults.dueDate,
+        category: defaults.category,
+        priority: defaults.priority,
+        amount: defaults.amount || null,
+        completed: false,
+        createdAt: nowISOString,
+        updatedAt: nowISOString
+      };
+      
+      await db.insert(tasks).values(newTask);
+      createdTasks.push(newTask);
+    }
+    
+    return createdTasks;
+  } catch (error) {
+    console.error("Error in createBulkTasks:", error);
+    throw new Error(`Failed to create bulk tasks: ${error.message}`);
+  }
+}
 
-    if (!result.length) {
+export async function updateTask(id: string, updates: Partial<Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">>): Promise<Task> {
+  try {
+    const task = await getTaskById(id);
+    
+    if (!task) {
       throw new Error(`Task with id ${id} not found`);
     }
-
-    return result[0];
-  } catch (error) {
-    console.error("getTaskById: Error during database interaction:", error);
-    throw error;
-  }
-}
-
-export async function getUserTasks(userId: string): Promise<Task[]> {
-  const db = getDb();
-  try {
-    const result = await db.select()
-      .from(tasks)
-      .where(eq(tasks.userId, userId))
-      .orderBy(asc(tasks.dueDate), desc(tasks.createdAt));
-
-    return result;
-  } catch (error) {
-    console.error("getUserTasks: Error during database interaction:", error);
-    return []; // Consistent with original behavior
-  }
-}
-
-export async function getTasksByDateRange(userId: string, startDate: string, endDate: string): Promise<Task[]> {
-  const db = getDb();
-  try {
-    const result = await db.select()
-      .from(tasks)
-      .where(and(
-        eq(tasks.userId, userId),
-        gte(tasks.dueDate, startDate),
-        lte(tasks.dueDate, endDate)
-      ))
-      .orderBy(tasks.dueDate.asc());
-
-    return result;
-  } catch (error) {
-    console.error("getTasksByDateRange: Error during database interaction:", error);
-    return []; // Consistent with original behavior
-  }
-}
-
-export async function updateTask(id: string, taskData: Partial<Task>): Promise<Task> {
-  const db = getDb();
-  const now = new Date().toISOString();
-
-  try {
-    const currentTask = await getTaskById(id);
-
-    const updatedFields = {
-      ...taskData,
-      updatedAt: now
+    
+    const updatedTask = {
+      ...task,
+      ...updates,
+      updatedAt: new Date().toISOString() // Convert to string for SQLite compatibility
     };
-
-    await db.update(tasks)
-      .set(updatedFields)
+    
+    await db
+      .update(tasks)
+      .set(updatedTask)
       .where(eq(tasks.id, id));
-
-    const updatedTask = await getTaskById(id);
+    
     return updatedTask;
   } catch (error) {
-    console.error("updateTask: Error during database interaction:", error);
-    throw error;
+    console.error("Error in updateTask:", error);
+    throw new Error(`Failed to update task: ${error.message}`);
   }
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const db = getDb();
   try {
-    await db.delete(tasks)
-      .where(eq(tasks.id, id));
+    await db.delete(tasks).where(eq(tasks.id, id));
   } catch (error) {
-    console.error("deleteTask: Error during database interaction:", error);
-    throw error;
+    console.error("Error in deleteTask:", error);
+    throw new Error(`Failed to delete task: ${error.message}`);
+  }
+}
+
+export async function getTasksByDueDate(userId: string, date: Date): Promise<Task[]> {
+  try {
+    // Convert date to string format YYYY-MM-DD
+    const dateString = date.toISOString().split('T')[0];
+    
+    // Get all tasks for the user
+    const userTasks = await getUserTasks(userId);
+    
+    // Filter tasks that have the same due date
+    return userTasks.filter(task => {
+      if (!task.dueDate) return false;
+      return task.dueDate.startsWith(dateString);
+    });
+  } catch (error) {
+    console.error("Error in getTasksByDueDate:", error);
+    return [];
   }
 }

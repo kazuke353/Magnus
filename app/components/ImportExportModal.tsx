@@ -1,7 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FiUpload, FiDownload, FiCopy, FiX, FiCheck, FiAlertTriangle } from "react-icons/fi";
 import Button from "./Button";
-import Card from "./Card";
 
 interface ImportExportModalProps {
   onClose: () => void;
@@ -21,6 +20,35 @@ export default function ImportExportModal({
   const [parseError, setParseError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [onClose]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -156,38 +184,41 @@ export default function ImportExportModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
+      <div 
+        ref={modalRef}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform"
+      >
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {activeTab === "import" ? "Import Portfolio" : "Export Portfolio"}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <FiX className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
-            className={`py-2 px-4 ${
+            className={`py-3 px-4 ${
               activeTab === "import"
-                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
+                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            } transition-colors`}
             onClick={() => setActiveTab("import")}
           >
             <FiUpload className="inline-block mr-2" />
             Import
           </button>
           <button
-            className={`py-2 px-4 ${
+            className={`py-3 px-4 ${
               activeTab === "export"
-                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
+                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            } transition-colors`}
             onClick={() => setActiveTab("export")}
           >
             <FiDownload className="inline-block mr-2" />
@@ -195,96 +226,98 @@ export default function ImportExportModal({
           </button>
         </div>
 
-        {activeTab === "import" ? (
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="hidden"
-                ref={fileInputRef}
-              />
-              <FiUpload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Upload a Trading 212 Pie CSV file
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
-                CSV should contain pie data exported from Trading 212
-              </p>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="mb-2"
-              >
-                Select CSV File
-              </Button>
-              {csvFile && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Selected file: {csvFile.name}
+        <div className="p-4">
+          {activeTab === "import" ? (
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  ref={fileInputRef}
+                />
+                <FiUpload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-2" />
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Upload a Trading 212 Pie CSV file
                 </p>
-              )}
-            </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                  CSV should contain pie data exported from Trading 212
+                </p>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="mb-2"
+                >
+                  Select CSV File
+                </Button>
+                {csvFile && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    Selected file: {csvFile.name}
+                  </p>
+                )}
+              </div>
 
-            {parseError && (
-              <div className="bg-red-50 dark:bg-red-900 dark:bg-opacity-20 border-l-4 border-red-500 p-4 rounded">
-                <div className="flex">
-                  <FiAlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                  <p className="text-sm text-red-700 dark:text-red-400">{parseError}</p>
+              {parseError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-md">
+                  <div className="flex">
+                    <FiAlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                    <p className="text-sm text-red-700 dark:text-red-400">{parseError}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImport}
+                  isLoading={isImporting}
+                  disabled={!csvFile || isImporting}
+                >
+                  <FiUpload className="mr-2" />
+                  Import
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Export your portfolio data as a JSON file or copy it to your clipboard.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                  <Button onClick={handleExportJSON}>
+                    <FiDownload className="mr-2" />
+                    Download JSON
+                  </Button>
+                  <Button variant="outline" onClick={handleCopyToClipboard}>
+                    {copied ? (
+                      <>
+                        <FiCheck className="mr-2 text-green-500" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <FiCopy className="mr-2" />
+                        Copy to Clipboard
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
-            )}
 
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleImport}
-                isLoading={isImporting}
-                disabled={!csvFile || isImporting}
-              >
-                <FiUpload className="mr-2" />
-                Import
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Export your portfolio data as a JSON file or copy it to your clipboard.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <Button onClick={handleExportJSON}>
-                  <FiDownload className="mr-2" />
-                  Download JSON
-                </Button>
-                <Button variant="outline" onClick={handleCopyToClipboard}>
-                  {copied ? (
-                    <>
-                      <FiCheck className="mr-2 text-green-500" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <FiCopy className="mr-2" />
-                      Copy to Clipboard
-                    </>
-                  )}
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" onClick={onClose}>
+                  Close
                 </Button>
               </div>
             </div>
-
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={onClose}>
-                Close
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

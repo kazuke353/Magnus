@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiEdit2, FiTrash2, FiDollarSign, FiCalendar, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiDollarSign, FiCalendar, FiChevronDown, FiChevronUp, FiCheck } from "react-icons/fi";
 import { Task } from "~/db/schema";
 import { formatDate, formatCurrency } from "~/utils/formatters";
 import Button from "./Button";
@@ -9,7 +9,9 @@ interface TaskItemProps {
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onToggleComplete: (taskId: string, completed: boolean) => void;
-  onClick?: () => void;
+  onSelect?: () => void;
+  isSelected?: boolean;
+  currency?: string;
 }
 
 export default function TaskItem({ 
@@ -17,7 +19,9 @@ export default function TaskItem({
   onEdit, 
   onDelete, 
   onToggleComplete,
-  onClick
+  onSelect,
+  isSelected,
+  currency = "$"
 }: TaskItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -42,36 +46,39 @@ export default function TaskItem({
     onDelete(task.id);
   };
   
-  const handleToggleComplete = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleComplete(task.id, e.target.checked);
+    onToggleComplete(task.id, !task.completed);
   };
   
   return (
     <div 
       className={`border border-gray-200 dark:border-gray-700 rounded-lg mb-4 overflow-hidden transition-all duration-200 ${
-        onClick ? 'cursor-pointer hover:shadow-md' : ''
+        isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''
+      } ${
+        onSelect ? 'cursor-pointer hover:shadow-md' : ''
       }`}
-      onClick={onClick}
+      onClick={onSelect}
     >
-      <div className="p-4 bg-white dark:bg-gray-800">
+      <div className={`p-4 ${task.completed ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-white dark:bg-gray-800'}`}>
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1">
-            <div className="mt-1">
-              <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={handleToggleComplete}
-                className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                aria-label={`Mark task "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
-              />
-            </div>
+            <button
+              onClick={handleToggleComplete}
+              className={`mt-1 h-5 w-5 rounded-full flex items-center justify-center border ${
+                task.completed 
+                  ? 'bg-blue-500 border-blue-500 text-white' 
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
+              aria-label={`Mark task "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
+            >
+              {task.completed && <FiCheck className="h-3 w-3" />}
+            </button>
             
             <div className="flex-1">
               <div className="flex items-center">
                 <h3 
                   className={`text-lg font-medium flex-1 ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}
-                  onClick={handleToggleExpand}
                 >
                   {task.title}
                 </h3>
@@ -110,7 +117,7 @@ export default function TaskItem({
                 {task.amount && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                     <FiDollarSign className="mr-1" />
-                    {formatCurrency(task.amount)}
+                    {formatCurrency(task.amount, currency)}
                   </span>
                 )}
               </div>
