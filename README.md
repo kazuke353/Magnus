@@ -2,7 +2,7 @@
 
 Magnus is a comprehensive personal finance management application designed to help users track their investments (with specific integration for Trading 212), manage financial or life goals, organize tasks, and interact with an AI financial or life assistant.
 
-[![Remix](https://img.shields.io/badge/Remix-v2-blueviolet.svg)](https://remix.run) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3-blue.svg)](https://tailwindcss.com/)
+[![Remix](https://img.shields.io/badge/Remix-v2-blueviolet.svg)](https://remix.run) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-blue.svg)](https://tailwindcss.com/)
 
 ## Features
 
