@@ -643,25 +643,24 @@ export default function TasksPage() {
           </Button>
           
           <Button
-            onClick={() => setShowImportModal(true)}
-            variant="outline"
-            size="sm"
-          >
-            <FiUpload className="mr-1" />
-            Import
-          </Button>
-          
-          <Button
             onClick={() => {
               setShowRecurringForm(true);
               setEditingRecurringTask(null);
               setEditingRecurringPattern(null);
             }}
-            variant="outline"
             size="sm"
           >
+            <FiPlus className="mr-1" />
             <FiRepeat className="mr-1" />
             Recurring
+          </Button>
+
+          <Button
+            onClick={() => setShowImportModal(true)}
+            size="sm"
+          >
+            <FiUpload className="mr-1" />
+            Import
           </Button>
           
           <Button

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Task, RecurringPattern } from "~/db/schema";
-import { formatDateForInput, getCurrentDateForInput } from "~/utils/date";
+import { getCurrentDateForInput } from "~/utils/date";
+import { formatDateForInput } from "~/utils/formatters";
 import Button from "./Button";
 import Input from "./Input";
 import { FiX, FiRepeat, FiCalendar } from "react-icons/fi";

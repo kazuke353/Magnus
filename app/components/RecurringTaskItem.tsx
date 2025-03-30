@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Task, RecurringPattern } from "~/db/schema";
-import { formatDate, isToday, isPast } from "~/utils/date";
+import { isToday, isPast } from "~/utils/date";
+import { formatDate } from "~/utils/formatters";
 import { FiEdit2, FiTrash2, FiCalendar, FiRepeat, FiClock, FiDollarSign } from "react-icons/fi";
 import Button from "./Button";
 
