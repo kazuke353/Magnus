@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, NavLink } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { FiHome, FiDollarSign, FiMessageSquare, FiCalendar, FiSettings, FiTarget, FiMenu, FiX } from "react-icons/fi";
+import { FiHome, FiDollarSign, FiMessageSquare, FiCalendar, FiSettings, FiTarget, FiMenu, FiX, FiEye } from "react-icons/fi";
 import { ToastContainer } from "~/components/ToastContainer";
 
 export default function AppLayout() {
@@ -15,6 +15,7 @@ export default function AppLayout() {
   const navItems = [
     { to: "/dashboard", icon: FiHome, label: "Dashboard" },
     { to: "/portfolio", icon: FiDollarSign, label: "Portfolio" },
+    { to: "/watchlist", icon: FiEye, label: "Watchlist" },
     { to: "/goals", icon: FiTarget, label: "Goals" },
     { to: "/tasks", icon: FiCalendar, label: "Tasks" },
     { to: "/chat", icon: FiMessageSquare, label: "Chat" },

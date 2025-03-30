@@ -361,7 +361,7 @@ export default function Dashboard() {
                          <div key={portfolio} className="flex justify-between items-center">
                            <span className="text-sm text-gray-700 dark:text-gray-300">{portfolio}</span>
                            <span className={`text-sm font-medium ${
-                             difference.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                             difference < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                            }`}>
                              {difference}
                            </span>

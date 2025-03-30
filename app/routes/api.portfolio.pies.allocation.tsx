@@ -1,6 +1,6 @@
 import { json } from '@remix-run/node';
 import type { ActionFunction } from '@remix-run/node';
-import { requireUserId } from '~/services/auth.server';
+import { requireAuthentication } from '~/services/auth.server'; // Use requireAuthentication
 import { db } from '~/db/database.server';
 import { portfolioAllocations } from '~/db/schema';
 import { eq } from 'drizzle-orm';
@@ -8,7 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { PieAllocation } from '~/utils/portfolio/types';
 
 export const action: ActionFunction = async ({ request }) => {
-  const userId = await requireUserId(request);
+  const user = await requireAuthentication(request, "/login");
+  const userId = user.id;
   
   if (request.method === 'POST') {
     try {
@@ -67,7 +68,8 @@ export const action: ActionFunction = async ({ request }) => {
 };
 
 export const loader = async ({ request }: { request: Request }) => {
-  const userId = await requireUserId(request);
+  const user = await requireAuthentication(request, "/login");
+  const userId = user.id;
   
   try {
     // Load allocations from database

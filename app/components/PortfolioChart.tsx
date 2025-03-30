@@ -31,10 +31,10 @@ export default function PortfolioChart({
     // Extract data for the pie chart
     const portfolioNames = Object.keys(portfolioData.allocationAnalysis.currentAllocation);
 
-    // Extract percentages from strings like "50.54%"
-    const currentAllocationValues = Object.values(portfolioData.allocationAnalysis.currentAllocation).map(value => {
-      const percentMatch = value.match(/^(.*?)%$/);
-      return percentMatch ? parseFloat(percentMatch[1]) : 0;
+    // Extract percentages from the 'percent' property of the objects
+    const currentAllocationValues = Object.values(portfolioData.allocationAnalysis.currentAllocation).map(valueObj => {
+      // Access the 'percent' property of the object
+      return typeof valueObj.percent === 'number' ? valueObj.percent : 0;
     });
 
     return {
@@ -161,7 +161,7 @@ export default function PortfolioChart({
           {hoveredSegment && (
             <div className="text-sm text-gray-600 dark:text-gray-300">
               <span className="font-medium">{hoveredSegment}:</span> {segmentValues[hoveredSegment]?.toFixed(2)} {currency}
-              <span className={`ml-2 ${allocationDifferences[hoveredSegment]?.startsWith('-') ? 'text-red-500' : 'text-green-500'}`}>
+              <span className={`ml-2 ${allocationDifferences[hoveredSegment] < 0 ? 'text-red-500' : 'text-green-500'}`}>
                 {allocationDifferences[hoveredSegment]}
               </span>
             </div>

@@ -183,8 +183,9 @@ export default function SortableTable<T>({
                 >
                   <div className="flex items-center">
                     <span>{column.header}</span>
-                    {column.sortable !== false && sortConfig?.key === column.key && (
+                    {column.sortable !== false && sortConfig && sortConfig.key === column.key && ( // Check sortConfig is truthy AND the key matches
                       <span className="ml-1">
+                        {/* Now it's safe to access sortConfig.direction */}
                         {sortConfig.direction === 'asc' ? (
                           <FiChevronUp className="h-4 w-4" />
                         ) : (

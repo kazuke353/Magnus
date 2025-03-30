@@ -1,10 +1,11 @@
 import { json } from '@remix-run/node';
 import type { LoaderFunction } from '@remix-run/node';
-import { requireUserId } from '~/services/auth.server';
+import { requireAuthentication } from '~/services/auth.server'; // Use requireAuthentication
 import { getInstrumentDetails } from '~/utils/portfolio/instruments';
 
 export const loader: LoaderFunction = async ({ request, params }) => {
-  const userId = await requireUserId(request);
+  const user = await requireAuthentication(request, "/login");
+  const userId = user.id;
   const { symbol } = params;
   
   if (!symbol) {
