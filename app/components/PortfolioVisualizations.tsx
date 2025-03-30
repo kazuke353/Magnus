@@ -1,19 +1,15 @@
-import { useMemo } from 'react';
-import Card from './Card';
+import { useState } from 'react';
+import { PerformanceMetrics, Benchmark } from '~/utils/portfolio/types';
 import PortfolioChart from './PortfolioChart';
+import PortfolioAllocationAnalysis from './PortfolioAllocationAnalysis';
 import PortfolioValueChart from './PortfolioValueChart';
 import PerformanceComparisonChart from './PerformanceComparisonChart';
-import PortfolioAllocationAnalysis from './PortfolioAllocationAnalysis';
-import { PerformanceMetrics } from '~/utils/portfolio_fetcher';
+import Button from './Button';
+import { FiRefreshCw } from 'react-icons/fi';
 
 interface HistoricalValue {
   date: string;
   value: number;
-}
-
-interface Benchmark {
-  name: string;
-  returnPercentage: number;
 }
 
 interface PortfolioVisualizationsProps {
@@ -21,11 +17,10 @@ interface PortfolioVisualizationsProps {
   currency: string;
   currentValue: number;
   historicalValues: HistoricalValue[];
-  benchmarks: Benchmark[];
+  benchmarks?: Benchmark[];
   onRebalanceClick: () => void;
-  onSaveHistoricalData: (data: HistoricalValue[]) => void;
-  onSaveBenchmarks: (data: Benchmark[]) => void;
-  className?: string;
+  onSaveHistoricalData?: (data: HistoricalValue[]) => void;
+  onSaveBenchmarks?: (benchmarks: Benchmark[]) => void;
 }
 
 export default function PortfolioVisualizations({
@@ -33,60 +28,71 @@ export default function PortfolioVisualizations({
   currency,
   currentValue,
   historicalValues,
-  benchmarks,
+  benchmarks = [],
   onRebalanceClick,
   onSaveHistoricalData,
-  onSaveBenchmarks,
-  className = ""
+  onSaveBenchmarks
 }: PortfolioVisualizationsProps) {
-  // Extract portfolio performances for comparison chart
-  const portfolioPerformances = useMemo(() => {
-    if (!portfolioData?.portfolio) return [];
-    
-    return portfolioData.portfolio.map(pie => ({
-      name: pie.name,
-      returnPercentage: pie.returnPercentage
-    }));
-  }, [portfolioData]);
+  const [activeTab, setActiveTab] = useState('allocation');
 
-  if (!portfolioData || !portfolioData.allocationAnalysis) {
-    return null;
+  // Extract portfolio performances for comparison chart
+  const portfolioPerformances = portfolioData.portfolio
+    ? portfolioData.portfolio
+        .filter(pie => pie.name !== 'OverallSummary')
+        .map(pie => ({
+          name: pie.name,
+          returnPercentage: pie.returnPercentage
+        }))
+    : [];
+
+  // Add overall portfolio performance
+  if (portfolioData.overallSummary?.overallSummary) {
+    portfolioPerformances.unshift({
+      name: 'Overall Portfolio',
+      returnPercentage: portfolioData.overallSummary.overallSummary.returnPercentageOverall
+    });
   }
 
+  // Use benchmarks from portfolio data if available, otherwise use props
+  const displayBenchmarks = portfolioData.benchmarks?.length 
+    ? portfolioData.benchmarks 
+    : benchmarks;
+
   return (
-    <div className={className}>
-      {/* Portfolio Allocation Chart and Analysis */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card className="lg:col-span-2 shadow-md rounded-xl bg-gray-50 dark:bg-gray-800 p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Portfolio Performance</h2>
-          <PortfolioChart 
-            portfolioData={portfolioData} 
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-1/2">
+          <PortfolioChart
+            portfolioData={portfolioData}
             currency={currency}
-            showRebalanceButton={true}
+          />
+        </div>
+        <div className="w-full md:w-1/2">
+          <PortfolioAllocationAnalysis
+            allocationAnalysis={portfolioData.allocationAnalysis}
             onRebalanceClick={onRebalanceClick}
           />
-        </Card>
-
-        <PortfolioAllocationAnalysis 
-          allocationData={portfolioData.allocationAnalysis}
-          onRebalanceClick={onRebalanceClick}
-        />
+        </div>
       </div>
 
-      {/* Portfolio Value Trend and Performance Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PortfolioValueChart 
-          currentValue={currentValue}
-          currency={currency}
-          initialHistoricalData={historicalValues}
-          onSaveHistoricalData={onSaveHistoricalData}
-        />
-        
-        <PerformanceComparisonChart 
-          portfolioPerformances={portfolioPerformances}
-          initialBenchmarks={benchmarks}
-          onSaveBenchmarks={onSaveBenchmarks}
-        />
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-1/2">
+          <PortfolioValueChart
+            currentValue={currentValue}
+            historicalValues={historicalValues}
+            currency={currency}
+            onSaveHistoricalData={onSaveHistoricalData}
+          />
+        </div>
+        <div className="w-full md:w-1/2">
+          <PerformanceComparisonChart
+            portfolioPerformances={portfolioPerformances}
+            initialBenchmarks={displayBenchmarks}
+            onSaveBenchmarks={onSaveBenchmarks}
+            currency={currency}
+            totalInvested={portfolioData.overallSummary?.overallSummary.totalInvestedOverall || 0}
+          />
+        </div>
       </div>
     </div>
   );

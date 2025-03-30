@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 
 // Users table
 export const users = sqliteTable("users", {
@@ -71,90 +71,32 @@ export const goals = sqliteTable("goals", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const userPortfolios = sqliteTable("user_portfolios", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  portfolioData: text("portfolio_data", { mode: "json" }).notNull(),
-  fetchDate: text("fetch_date").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull()
 });
 
-export const trading212Pies = sqliteTable("trading212_pies", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  allocation: integer("allocation").notNull(),
-  pieData: text("pie_data").notNull(),
-  importDate: text("import_date").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
+export const portfolios = sqliteTable('portfolios', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  data: text('data').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 });
 
-// User type
-export interface User {
-  id: string;
-  email: string;
-  passwordHash: string;
-  firstName: string | null;
-  lastName: string | null;
-  createdAt: string;
-  updatedAt: string;
-  settings: {
-    theme?: 'light' | 'dark';
-    currency?: string;
-    language?: string;
-    notifications?: boolean;
-    monthlyBudget?: number;
-    country?: string;
-  };
-}
+export const watchlists = sqliteTable('watchlists', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  data: text('data').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});
 
-// Task type
-export interface Task {
-  id: string;
-  userId: string;
-  title: string;
-  description: string | null;
-  dueDate: string | undefined;
-  completed: boolean;
-  amount: number | null;
-  category: string | undefined;
-  priority: "low" | "medium" | "high";
-  createdAt: string;
-  updatedAt: string;
-  // Recurring task fields
-  isRecurring: boolean;
-  recurringPatternId: string | null;
-  parentTaskId: string | null;
-}
-
-// Recurring pattern type
-export interface RecurringPattern {
-  id: string;
-  userId: string;
-  frequency: "daily" | "weekly" | "monthly" | "yearly";
-  interval: number;
-  daysOfWeek: string | null; // Comma-separated days (1-7, where 1 is Monday)
-  dayOfMonth: number | null; // 1-31
-  monthOfYear: number | null; // 1-12
-  endDate: string | null;
-  occurrences: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Goal type
-export interface Goal {
-  id: string;
-  userId: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  monthlyContribution: number;
-  expectedReturn: number;
-  currency: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export const portfolioAllocations = sqliteTable('portfolio_allocations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  data: text('data').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});

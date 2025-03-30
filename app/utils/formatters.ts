@@ -1,125 +1,101 @@
-import { formatDate, formatDateWithDay } from "./date";
-
 /**
- * Format a currency value
- * @param amount Number to format
- * @param currencySymbol Currency symbol to use
- * @returns Formatted currency string
- */
-export function formatCurrency(amount: number, currencySymbol: string = "$"): string {
-  try {
-    return `${currencySymbol}${amount.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
-  } catch (error) {
-    console.error('Error formatting currency:', error);
-    return `${currencySymbol}${amount}`;
-  }
-}
-
-/**
- * Format a percentage value
- * @param value Number to format as percentage
- * @param decimalPlaces Number of decimal places to show
+ * Formats a number as a percentage
+ * @param value Number to format
+ * @param includeSymbol Whether to include the % symbol
  * @returns Formatted percentage string
  */
-export function formatPercentage(value: number, decimalPlaces: number = 2): string {
-  try {
-    return `${value.toLocaleString('en-US', {
-      minimumFractionDigits: decimalPlaces,
-      maximumFractionDigits: decimalPlaces
-    })}%`;
-  } catch (error) {
-    console.error('Error formatting percentage:', error);
-    return `${value}%`;
+export function formatPercentage(value: number, includeSymbol: boolean = true): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return includeSymbol ? '0%' : '0';
   }
+  
+  const formattedValue = value.toFixed(2);
+  return includeSymbol ? `${formattedValue}%` : formattedValue;
 }
 
 /**
- * Format a number with thousands separators
+ * Formats a number as currency
  * @param value Number to format
- * @param decimalPlaces Number of decimal places to show
+ * @param currency Currency code (default: USD)
+ * @param minimumFractionDigits Minimum fraction digits (default: 2)
+ * @returns Formatted currency string
+ */
+export function formatCurrency(
+  value: number, 
+  currency: string = 'USD', 
+  minimumFractionDigits: number = 2
+): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits
+    }).format(0);
+  }
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits
+  }).format(value);
+}
+
+/**
+ * Formats a date string
+ * @param dateString Date string to format
+ * @param includeTime Whether to include time
+ * @returns Formatted date string
+ */
+export function formatDate(dateString: string, includeTime: boolean = false): string {
+  if (!dateString) return '';
+  
+  const date = new Date(dateString);
+  
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+  
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return new Intl.DateTimeFormat('en-US', options).format(date);
+}
+
+/**
+ * Truncates text to a specified length
+ * @param text Text to truncate
+ * @param maxLength Maximum length
+ * @returns Truncated text
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+  
+  return text.substring(0, maxLength) + '...';
+}
+
+/**
+ * Formats a number with commas
+ * @param value Number to format
+ * @param decimalPlaces Number of decimal places
  * @returns Formatted number string
  */
 export function formatNumber(value: number, decimalPlaces: number = 0): string {
-  try {
-    return value.toLocaleString('en-US', {
-      minimumFractionDigits: decimalPlaces,
-      maximumFractionDigits: decimalPlaces
-    });
-  } catch (error) {
-    console.error('Error formatting number:', error);
-    return value.toString();
-  }
-}
-
-/**
- * Truncate text to a specified length
- * @param text Text to truncate
- * @param maxLength Maximum length before truncation
- * @param suffix Suffix to add when truncated (default: "...")
- * @returns Truncated text
- */
-export function truncateText(text: string, maxLength: number, suffix: string = "..."): string {
-  if (!text) return "";
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + suffix;
-}
-
-/**
- * Format a file size in bytes to a human-readable format
- * @param bytes File size in bytes
- * @returns Formatted file size string
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
-/**
- * Format a duration in seconds to a human-readable format
- * @param seconds Duration in seconds
- * @returns Formatted duration string
- */
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-}
-
-/**
- * Format a phone number to a standard format
- * @param phone Phone number to format
- * @returns Formatted phone number
- */
-export function formatPhoneNumber(phone: string): string {
-  if (!phone) return "";
-  
-  // Remove all non-numeric characters
-  const cleaned = phone.replace(/\D/g, "");
-  
-  // Format based on length
-  if (cleaned.length === 10) {
-    return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`;
-  } else if (cleaned.length === 11 && cleaned.startsWith("1")) {
-    return `+1 (${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7, 11)}`;
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0';
   }
   
-  // Return original if we can't format it
-  return phone;
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces
+  });
 }
-
-/**
- * Export date formatters for convenience
- */
-export { formatDate, formatDateWithDay };

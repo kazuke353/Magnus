@@ -1,69 +1,87 @@
-// app/routes/api.portfolio.tsx
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
-import { getPortfolioData, savePortfolioData } from "~/services/portfolio.server";
-import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
-import { errorResponse, createApiError } from "~/utils/error-handler";
+import { getPortfolioData, fetchPortfolioData, needsRefresh } from "~/services/portfolio.server";
+import { getBenchmarkData } from "~/utils/portfolio/benchmarks";
+import { createApiError, handleError } from "~/utils/error-handler";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    // Authenticate the user for this API endpoint
-    const user = await requireAuthentication(request);
-    if (!user) {
-      return json({ error: "Authentication required" }, { status: 401 });
-    }
-
-    // --- Check for refresh parameter ---
+    // Authenticate the user
+    const user = await requireAuthentication(request, "/login");
+    
+    // Check if we need to force refresh the data
     const url = new URL(request.url);
-    const shouldForceRefresh = url.searchParams.get("refresh") === "true";
-    // --- End Check ---
-
-    let portfolioData: PerformanceMetrics | null = null;
-    let cacheUsed = false; // Flag to track cache usage
-
-    // Get portfolio data (conditionally checking cache)
-    if (!shouldForceRefresh) {
-      // Try cache only if not forcing refresh
-      const cachedData = await getPortfolioData(user.id);
-      if (cachedData) {
-        portfolioData = cachedData;
-        cacheUsed = true;
-      }
-    }
-
-    // If no cached data was used (either cache miss or forced refresh)
-    if (!cacheUsed) {
+    const forceRefresh = url.searchParams.get("refresh") === "true";
+    
+    // Get portfolio data
+    let portfolioData;
+    
+    if (forceRefresh || await needsRefresh(user.id)) {
       // Fetch fresh data
-      // Note: Ensure getPortfolioData can be called with settings if needed.
-      portfolioData = await getPortfolioData(user.settings.monthlyBudget, user.settings.country); // Assuming getPortfolioData handles fetching logic
-
-      if (portfolioData) {
-         await savePortfolioData(user.id, portfolioData);
-      } else {
-          if (shouldForceRefresh) {
-              return json({ portfolioData: null, error: "Failed to fetch fresh data on refresh." }, { status: 500 });
-          }
+      portfolioData = await fetchPortfolioData(user.settings, user.id);
+    } else {
+      // Use cached data
+      portfolioData = await getPortfolioData(user.id);
+    }
+    
+    if (!portfolioData) {
+      throw createApiError("Failed to retrieve portfolio data", 500);
+    }
+    
+    // Mock historical values (in a real app, these would come from the database)
+    const historicalValues = generateMockHistoricalValues();
+    
+    // Get benchmark data if not already included in portfolio data
+    let benchmarks = portfolioData.benchmarks || [];
+    if (benchmarks.length === 0) {
+      try {
+        benchmarks = await getBenchmarkData(true); // Use simulated data
+      } catch (error) {
+        console.error("Error fetching benchmark data:", error);
+        // Continue without benchmarks if there's an error
       }
     }
-
-
-    if (!portfolioData) {
-       return json({ portfolioData: null });
-    }
-
-    const headers = shouldForceRefresh
-        ? { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        : { 'Cache-Control': 'private, max-age=3600, stale-while-revalidate=60' };
-
-    return json({ portfolioData }, { headers });
-
+    
+    return json({
+      portfolioData,
+      historicalValues,
+      benchmarks
+    });
   } catch (error) {
-    console.error("Error loading portfolio data in API route:", error);
-    const apiError = createApiError(error, 500);
-    return json({ portfolioData: null, error: apiError.message, details: apiError.details }, { status: apiError.status });
+    console.error("API Portfolio Error:", error);
+    
+    if (error instanceof Response) {
+      throw error;
+    }
+    
+    const apiError = handleError(error);
+    return json(
+      { error: apiError.message, details: apiError.details },
+      { status: apiError.status }
+    );
   }
 };
 
-// Optional: Action function if you need to trigger updates via POST/PUT etc.
-// export const action = async ({ request }: ActionFunctionArgs) => { ... };
+// Helper function to generate mock historical values
+function generateMockHistoricalValues() {
+  const values = [];
+  const now = new Date();
+  let currentValue = 10000; // Starting value
+  
+  for (let i = 365; i >= 0; i -= 7) { // Weekly data points for a year
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    // Add some randomness to simulate market fluctuations
+    const randomChange = (Math.random() - 0.45) * 0.05; // -2.5% to +2.5%
+    currentValue = currentValue * (1 + randomChange);
+    
+    values.push({
+      date: date.toISOString().split('T')[0],
+      value: Math.round(currentValue * 100) / 100
+    });
+  }
+  
+  return values;
+}

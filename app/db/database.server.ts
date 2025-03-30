@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
-import { users, tasks, chatMessages, goals, userPortfolios, trading212Pies, recurringPatterns } from "./schema";
+import { users, tasks, chatMessages, goals, sessions, portfolios, watchlists, recurringPatterns, portfolioAllocations } from "./schema";
 import { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 
 // Define a variable to hold the drizzle instance
@@ -28,10 +28,12 @@ export function getDb() {
         users, 
         tasks, 
         chatMessages, 
-        goals, 
-        userPortfolios, 
-        trading212Pies,
-        recurringPatterns 
+        goals,
+        sessions,
+        portfolios, 
+        watchlists,
+        recurringPatterns,
+        portfolioAllocations
       } 
     });
     
@@ -48,10 +50,12 @@ function initializeDatabase(db: Database.Database) {
     users, 
     tasks, 
     chatMessages, 
-    goals, 
-    userPortfolios, 
-    trading212Pies,
-    recurringPatterns
+    goals,
+    sessions,
+    portfolios, 
+    watchlists,
+    recurringPatterns,
+    portfolioAllocations
   ];
 
   // For development only - comment this out in production
@@ -72,6 +76,7 @@ function initializeDatabase(db: Database.Database) {
 function generateTableSQL(table: SQLiteTable) {
   const tableName = table[Symbol.for("drizzle:Name")];
   const columns = Object.entries(table).filter(([key]) => key !== "sqliteTable") as [string, SQLiteColumn][];
+  console.log("Creating ", tableName)
 
   const columnDefs = columns.map(([_, column]) => {
     // Use the SQL column name from the schema, not the TS property name
