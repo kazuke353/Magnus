@@ -11,7 +11,6 @@ import {
 } from "@remix-run/react";
 import { getUser } from "~/services/session.server";
 import { getTheme, getThemeClass } from "~/utils/theme";
-import { useEffect } from "react";
 import { useTheme } from "~/hooks/useTheme";
 
 const tailwindStylesheetUrl = "./app/styles/tailwind.css";
@@ -31,31 +30,18 @@ export const links: LinksFunction = () => [
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getUser(request);
-  const theme = getTheme(request);
-  
-  // Set default locale for consistent date formatting
+  const theme = getTheme(request); // Reads from cookie
   const locale = user?.settings?.locale || 'en-US';
-  
-  return json({ 
-    user, 
-    theme,
-    locale
-  });
+  return json({ user, theme, locale });
 };
 
 export default function App() {
   const { theme: serverTheme } = useLoaderData<typeof loader>();
-  const { theme, updateTheme } = useTheme(serverTheme);
-  
-  // Get the actual CSS class to apply based on the theme
+  // Assume useTheme hook exists and works - we need its implementation later
+  const { theme } = useTheme(serverTheme); // Hook manages client state
+
+  // Get the actual CSS class based on the theme state managed by the hook
   const themeClass = getThemeClass(theme);
-  
-  // Apply theme on initial load
-  useEffect(() => {
-    if (serverTheme) {
-      updateTheme(serverTheme);
-    }
-  }, [serverTheme, updateTheme]);
 
   return (
     <html lang="en" className={`${themeClass} h-full`}>

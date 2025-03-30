@@ -17,11 +17,9 @@ export function getDb() {
     
     // Create data directory if it doesn't exist
     if (!fs.existsSync(dataDir)) {
-      console.log("Creating data directory:", dataDir);
       fs.mkdirSync(dataDir, { recursive: true });
     }
 
-    console.log("Initializing database at:", dbPath);
     const db = new Database(dbPath);
     db.pragma("foreign_keys = ON");
 
@@ -62,7 +60,6 @@ function initializeDatabase(db: Database.Database) {
   for (const table of tables) {
     try {
       const createTableQuery = generateTableSQL(table);
-      console.log(`Creating table if not exists: ${table[Symbol.for("drizzle:Name")]}`);
       db.exec(createTableQuery);
     } catch (error) {
       console.error(`Failed to create table ${table[Symbol.for("drizzle:Name")]}:`, error);

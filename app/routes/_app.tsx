@@ -6,29 +6,6 @@ import { ToastContainer } from "~/components/ToastContainer";
 export default function AppLayout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-
-  // Initialize theme from localStorage on client side
-  useEffect(() => {
-    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
-    if (storedTheme) {
-      setTheme(storedTheme);
-    } else {
-      // Default to system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
-    
-      // Apply theme class
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(
-        storedTheme === 'dark' || 
-        (storedTheme === 'system' && prefersDark) || 
-        (!storedTheme && prefersDark) 
-          ? 'dark' 
-          : 'light'
-      );
-    }
-  }, []);
 
   // Close mobile menu when route changes
   useEffect(() => {

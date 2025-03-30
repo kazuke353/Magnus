@@ -2,10 +2,7 @@
 module.exports = {
   ignoredRouteFiles: ["**/.*"],
   serverDependenciesToBundle: [
-    "remix-utils", // If you are using remix-utils, include it
-    "@remix-run/css-bundle" // Ensure css-bundle is listed
+    "remix-utils",
+    "@remix-run/css-bundle"
   ],
-  dev: {
-	port: 8002,
-  },
 };

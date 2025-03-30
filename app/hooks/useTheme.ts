@@ -1,38 +1,44 @@
-import { useState, useEffect } from 'react';
-import { Theme, getThemeClass, applyTheme } from '~/utils/theme';
+import { useState, useEffect, useCallback } from 'react';
+import { Theme, applyTheme } from '~/utils/theme';
 
-export function useTheme(initialTheme: Theme = 'light') {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-  
+// Helper function to determine the initial theme on the client side
+const getInitialClientTheme = (serverFallback: Theme): Theme => {
+  if (typeof window === 'undefined') {
+    return serverFallback || 'light';
+  }
+
+  const storedTheme = localStorage.getItem('theme') as Theme | null;
+
+  if (storedTheme && ['light', 'dark', 'system'].includes(storedTheme)) {
+    return storedTheme;
+  }
+
+  if (serverFallback && ['light', 'dark', 'system'].includes(serverFallback)) {
+    localStorage.setItem('theme', serverFallback);
+    return serverFallback;
+  }
+
+  localStorage.setItem('theme', 'system');
+  return 'system';
+};
+
+
+export function useTheme(initialThemeFromServer: Theme = 'light') {
+  const [theme, setTheme] = useState<Theme>(() =>
+    getInitialClientTheme(initialThemeFromServer)
+  );
+
   useEffect(() => {
-    // Get theme from localStorage on client side
-    const storedTheme = localStorage.getItem('theme') as Theme | null;
-    if (storedTheme) {
-      setTheme(storedTheme);
-      applyTheme(storedTheme);
-    } else if (initialTheme) {
-      // Use the server-provided theme if no localStorage value
-      setTheme(initialTheme);
-      applyTheme(initialTheme);
-      localStorage.setItem('theme', initialTheme);
-    } else {
-      // Default to system preference if no theme is provided
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const defaultTheme = prefersDark ? 'dark' : 'light';
-      setTheme(defaultTheme);
-      applyTheme(defaultTheme);
-      localStorage.setItem('theme', defaultTheme);
+    applyTheme(theme);
+  }, [theme]);
+
+  const updateTheme = useCallback((newTheme: Theme) => {
+    const validTheme: Theme = ['light', 'dark', 'system'].includes(newTheme) ? newTheme : 'system';
+    setTheme(validTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', validTheme);
     }
-  }, [initialTheme]);
-  
-  const updateTheme = (newTheme: Theme) => {
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    applyTheme(newTheme);
-    
-    // We don't set the cookie here because that requires a server action
-    // The cookie will be set when the form is submitted in the settings page
-  };
-  
+  }, []);
+
   return { theme, updateTheme };
 }

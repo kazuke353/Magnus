@@ -31,7 +31,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    console.log("Login action: Attempting authenticator.authenticate...");
     const formData = await request.formData();
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
@@ -39,7 +38,6 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!user) {
       throw new Error("Invalid email or password");
     }
-    console.log("Login action: authenticator.authenticate call completed successfully. User:", user);
 
     const sessionCookie = await setUserSession(request, user.id);
     

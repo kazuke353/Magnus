@@ -59,10 +59,8 @@ export async function fetchPortfolioData(settings: UserSettings, userId: string)
       const now = new Date();
       
       if (addMinutes(fetchDate, CACHE_DURATION) > now) {
-        console.log("Returning cached portfolio data.");
         return cachedData;
       }
-      console.log("Cached data is stale. Fetching new data.");
     }
 
     const portfolioData = await fetchPortfolioDataUtil(settings.monthlyBudget, settings.country);
@@ -134,7 +132,6 @@ export async function getCachedPortfolioData(userId: string): Promise<Performanc
       .limit(1);
 
     if (result.length === 0) {
-      console.log("No cached portfolio data found for this user.");
       return null;
     }
 

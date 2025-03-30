@@ -104,25 +104,16 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function verifyLogin(email: string, password: string): Promise<User | null> {
-  console.log(`verifyLogin: Attempting login for email: ${email}`);
   const user = await getUserByEmail(email);
-  if (!user) {
-    console.log(`verifyLogin: User not found for email: ${email}`);
-    return null;
-  }
-
-  if (!user.passwordHash) {
-    console.log(`verifyLogin: Password not found for email: ${email}`);
+  if (!user || !user.passwordHash) {
     return null;
   }
 
   const isValid = bcrypt.compareSync(password, user.passwordHash);
   if (!isValid) {
-    console.log(`verifyLogin: Invalid password for email: ${email}`);
     return null;
   }
 
-  console.log(`verifyLogin: Login successful for email: ${email}`);
   return user;
 }
 

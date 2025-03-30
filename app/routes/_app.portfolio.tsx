@@ -183,8 +183,7 @@ export default function Portfolio() {
 
   // Effect to fetch portfolio details in background ONCE
    useEffect(() => {
-        if (!fetchInitiated.current && user) { // Only fetch if user exists
-            console.log("Triggering background portfolio details fetch...");
+        if (!fetchInitiated.current && user) {
             fetchInitiated.current = true;
             setDetailsLoading(true);
             setDetailsError(null);
@@ -355,7 +354,7 @@ export default function Portfolio() {
     if (!portfolioData || !portfolioData.overallSummary || !portfolioData.overallSummary.overallSummary) {
       return null;
     }
-    console.log("Recalculating portfolioSummary memo");
+    
     return {
       totalInvested: portfolioData.overallSummary.overallSummary.totalInvestedOverall || 0,
       totalResult: portfolioData.overallSummary.overallSummary.totalResultOverall || 0,

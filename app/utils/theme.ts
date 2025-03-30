@@ -34,18 +34,27 @@ function parseCookies(cookieHeader: string): Record<string, string> {
 }
 
 export function getThemeClass(theme: Theme): string {
-  if (!theme) return 'light'; // Default to light if theme is undefined
-  
-  if (theme === 'dark') return 'dark';
-  if (theme === 'light') return 'light';
-  
-  // For system theme, check user preference
-  if (typeof window !== 'undefined') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'dark' : 'light';
+  let themeClass: 'light' | 'dark' = 'light'; // Default to light
+
+  if (theme === 'dark') {
+    themeClass = 'dark';
+  } else if (theme === 'light') {
+    themeClass = 'light';
+  } else if (theme === 'system') {
+    // Check system preference ONLY if theme is 'system'
+    if (typeof window !== 'undefined') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      themeClass = prefersDark ? 'dark' : 'light';
+    } else {
+      themeClass = 'light';
+    }
+  } else {
+    // Handle unexpected theme value
+     console.warn(`getThemeClass: Received unexpected theme value '${theme}', defaulting class to 'light'`);
+     themeClass = 'light';
   }
-  
-  return 'light'; // Default to light if we can't determine
+
+  return themeClass;
 }
 
 export function getThemeFromClass(): Theme {
@@ -62,22 +71,29 @@ export function getThemeFromClass(): Theme {
 
 // Apply theme class to document
 export function applyTheme(theme: Theme): void {
-  if (typeof document === 'undefined') return;
-  
-  // Ensure theme is a valid value
-  const validTheme: Theme = theme && ['light', 'dark', 'system'].includes(theme) 
-    ? theme 
+  if (typeof document === 'undefined') {
+      return;
+  }
+
+  const validTheme: Theme = theme && ['light', 'dark', 'system'].includes(theme)
+    ? theme
     : 'light';
-    
+
   const themeClass = getThemeClass(validTheme);
-  
-  // Remove existing theme classes
-  document.documentElement.classList.remove('light', 'dark');
-  
-  // Add the appropriate theme class
-  document.documentElement.classList.add(themeClass);
-  
-  // Update color-scheme meta tag
+  const htmlElement = document.documentElement;
+
+  // More robust class removal/addition
+  const currentIsDark = htmlElement.classList.contains('dark');
+  const currentIsLight = htmlElement.classList.contains('light');
+
+  if (themeClass === 'dark') {
+    if (currentIsLight) htmlElement.classList.remove('light');
+    if (!currentIsDark) htmlElement.classList.add('dark');
+  } else {
+    if (currentIsDark) htmlElement.classList.remove('dark');
+    if (!currentIsLight) htmlElement.classList.add('light');
+  }
+
   const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
   if (metaColorScheme) {
     metaColorScheme.setAttribute('content', themeClass);

@@ -27,50 +27,48 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireAuthentication(request, "/login");
-  
+
   const formData = await request.formData();
   const country = formData.get("country") as string || '';
   const currency = formData.get("currency") as string || 'USD';
   const monthlyBudgetStr = formData.get("monthlyBudget") as string || '0';
   const themeValue = formData.get("theme");
-  
-  // Ensure theme is a valid string
   const theme = themeValue && typeof themeValue === 'string' ? themeValue : 'light';
-  
+
   try {
     const monthlyBudget = parseFloat(monthlyBudgetStr);
-    
-    const validatedData = SettingsSchema.parse({
-      country,
-      currency,
-      monthlyBudget,
-      theme
-    });
-    
+    const validatedData = SettingsSchema.parse({ country, currency, monthlyBudget, theme });
+
     await updateUserSettings(user.id, validatedData);
-    
-    // Set theme cookie
-    const session = await getSession(request);
+
+    const cookieHeader = request.headers.get("Cookie");
+    const session = await getSession(cookieHeader);
+
     const headers = new Headers();
-    
-    // Ensure theme is a valid Theme type
-    const validTheme: Theme = ['light', 'dark', 'system'].includes(theme) 
-      ? theme as Theme 
-      : 'light';
-      
+    const validTheme: Theme = ['light', 'dark', 'system'].includes(theme) ? theme as Theme : 'light';
+
     headers.append("Set-Cookie", setThemeCookie(validTheme));
     headers.append("Set-Cookie", await commitSession(session));
-    
+
     return redirect("/settings", { headers });
+
   } catch (error) {
     console.error("Settings update error:", error);
-    
+
+    // Check if it's the specific cookie parsing error
+    if (error instanceof TypeError && error.message.includes("argument str must be a string")) {
+        console.error(">>> Error likely caused by getSession receiving invalid input (null header?).");
+        // Provide a more specific error message to the user
+        return json({ error: "There was a problem processing your session. Please try logging out and back in." }, { status: 500 });
+    }
+
     if (error instanceof z.ZodError) {
       const fieldErrors = error.flatten().fieldErrors;
       return json({ fieldErrors });
     }
-    
-    return json({ error: (error as Error).message });
+
+    // General error
+    return json({ error: (error as Error).message || "An unknown error occurred" }, { status: 500 });
   }
 }
 

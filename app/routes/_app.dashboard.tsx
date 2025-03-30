@@ -48,7 +48,6 @@ interface DashboardLoaderData {
   goals: Goal[];
   error?: any;
 }
-// --- End Loader Definition ---
 
 
 export default function Dashboard() {
@@ -56,7 +55,6 @@ export default function Dashboard() {
   const portfolioFetcher = useFetcher<{ portfolioData: PerformanceMetrics | null; error?: string; details?: any }>();
 
   const [portfolioData, setPortfolioData] = useState<PerformanceMetrics | null>(null);
-  // Initialize loading based on whether fetcher needs to load initially
   const [portfolioLoading, setPortfolioLoading] = useState(portfolioFetcher.state !== 'idle');
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
 
@@ -64,22 +62,17 @@ export default function Dashboard() {
     ? { user: null, upcomingTasks: [], goals: [], error: initialData.error }
     : { ...initialData, error: null };
 
-  // Ref to prevent multiple initial fetches
   const fetchInitiated = useRef(false);
 
-  // Trigger fetch ONCE using standard fetch
   useEffect(() => {
-      // Only fetch if not already initiated
       if (!fetchInitiated.current) {
-          console.log("Triggering background portfolio fetch (using standard fetch)...");
-          fetchInitiated.current = true; // Mark as initiated
-          setPortfolioLoading(true);     // Set loading true
-          setPortfolioError(null);       // Clear previous errors
+          fetchInitiated.current = true;
+          setPortfolioLoading(true);
+          setPortfolioError(null);
 
-          fetch("/api/portfolio") // Standard fetch to the API route
+          fetch("/api/portfolio")
               .then(response => {
                   if (!response.ok) {
-                      // Try to get error details from response body if possible
                       return response.json().catch(() => null).then(body => {
                            const errorMsg = body?.error || `HTTP error! Status: ${response.status}`;
                            console.error("API Response Error:", response.status, body);
@@ -89,7 +82,6 @@ export default function Dashboard() {
                   return response.json();
               })
               .then(data => {
-                  console.log("Data received via standard fetch:", data);
                   const { portfolioData: fetchedData, error: apiError } = data;
 
                   if (apiError) {
@@ -140,7 +132,6 @@ export default function Dashboard() {
             } else {
                 setPortfolioData(fetchedData);
                 setPortfolioError(null);
-                console.log("Portfolio data received:", fetchedData);
             }
         }
         // If idle but no data (e.g., initial state before load), don't turn off loading prematurely
@@ -167,7 +158,6 @@ export default function Dashboard() {
   // Memoize portfolio metrics based on the state variable
   const portfolioSummaryData = useMemo(() => {
     if (!portfolioData || !portfolioData.overallSummary || !portfolioData.overallSummary.overallSummary) return null;
-    console.log("Recalculating portfolioSummaryData memo");
     return {
       totalInvested: portfolioData.overallSummary.overallSummary.totalInvestedOverall || 0,
       totalResult: portfolioData.overallSummary.overallSummary.totalResultOverall || 0,
@@ -180,7 +170,6 @@ export default function Dashboard() {
   // Calculate current portfolio value based on the state variable
   const currentPortfolioValue = useMemo(() => {
     if (!portfolioSummaryData) return 0;
-    console.log("Recalculating currentPortfolioValue memo");
     return portfolioSummaryData.totalInvested + portfolioSummaryData.totalResult;
   }, [portfolioSummaryData]);
 

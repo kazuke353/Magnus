@@ -17,7 +17,6 @@ export const authenticator = new Authenticator<SessionData>(sessionStorage);
 
 authenticator.use(
   new FormStrategy(async ({ form }) => {
-    console.log("FormStrategy: Strategy function started...");
     const email = form.get("email") as string;
     const password = form.get("password") as string;
 
@@ -26,7 +25,6 @@ authenticator.use(
       throw createAuthenticationError("Invalid email or password");
     }
 
-    console.log("FormStrategy: Authentication successful in strategy.");
     return {
       userId: user.id,
       lastVerified: new Date().toISOString(),
