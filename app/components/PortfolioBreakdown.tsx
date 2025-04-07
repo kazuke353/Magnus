@@ -166,6 +166,16 @@ export default function PortfolioBreakdown({
                   )
                 },
                 {
+                  key: "performance_1day",
+                  header: "24H Perf.",
+                  sortable: true,
+                  render: (item) => (
+                    <span className={`${item.performance_1day >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {item.performance_1day ? formatPercentage(item.performance_1day) : 'N/A'}
+                    </span>
+                  )
+                },
+                {
                   key: "performance_1week",
                   header: "1W Perf.",
                   sortable: true,
