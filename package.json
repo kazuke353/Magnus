@@ -9,16 +9,17 @@
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc",
-    "build:android": "cap add android && cap sync android && cd android && ./gradlew assembleDebug"
+    "build:android": "cap sync android && cd android && ./gradlew assembleDebug"
+     // Note: Removed 'cap add android' as it's usually done once. 'cap sync' is more common before build.
   },
   "dependencies": {
-    "@capacitor/android": "^7.0.1",
-    "@capacitor/core": "^7.0.1",
+    "@capacitor/android": "^6.0.0", // Downgraded from v7
+    "@capacitor/core": "^6.0.0",    // Downgraded from v7
     "@headlessui/react": "^2.2.0",
-    "@remix-run/css-bundle": "*",
-    "@remix-run/node": "*",
-    "@remix-run/react": "*",
-    "@remix-run/serve": "*",
+    "@remix-run/css-bundle": "~2.9.2", // Pinned from *
+    "@remix-run/node": "~2.9.2",       // Pinned from *
+    "@remix-run/react": "~2.9.2",       // Pinned from *
+    "@remix-run/serve": "~2.9.2",       // Pinned from *
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.2",
     "bcryptjs": "^3.0.2",
@@ -37,36 +38,36 @@
     "react-dom": "^18.0.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^9.1.0",
-    "remix-auth": "^4.1.0",
-    "remix-auth-form": "^3.0.0",
+    "remix-auth": "^3.6.0",         // Downgraded from 4.1.0
+    "remix-auth-form": "^2.0.1",    // Downgraded from 3.0.0
     "tailwindcss": "^3.4.0",
     "uuid": "11.1.0",
     "yahoo-finance2": "^2.12.4",
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.1",
-    "@remix-run/dev": "*",
+    "@capacitor/cli": "^6.0.0",      // Downgraded from v7
+    "@remix-run/dev": "~2.9.2",         // Pinned from * and matched dependencies
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.13.9",
+    "@types/node": "^18.18.0",      // Downgraded from ^22
     "@types/react": "^18.0.10",
     "@types/react-dom": "^18.0.4",
-    "@typescript-eslint/eslint-plugin": "^8.26.0",
-    "@typescript-eslint/parser": "^8.26.0",
-    "drizzle-kit": "^0.19.1",
-    "eslint": "^9.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.0", // Consider potential compatibility, maybe downgrade if needed later
+    "@typescript-eslint/parser": "^8.26.0",       // Consider potential compatibility, maybe downgrade if needed later
+    "drizzle-kit": "^0.19.1",      // Keep for now, check compatibility if issues arise
+    "eslint": "^9.21.0",            // Keep for now, check compatibility if issues arise
     "eslint-import-resolver-typescript": "^3.8.3",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2",
-    "vite": "6.0.0",
+    "typescript": "^5.8.2",        // Keep for now, TS 5.x generally works with Node 18
+    "vite": "6.0.0",               // Stays, requires >=18.18.0
     "vite-tsconfig-paths": "^5.1.4"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.18.0"            // Updated for Node 18 (and Vite 6)
   }
 }
