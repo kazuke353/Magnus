@@ -8,7 +8,7 @@ import { createApiError, handleError } from "~/utils/error-handler";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     // Authenticate the user
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     
     // Check if we need to force refresh the data
     const url = new URL(request.url);

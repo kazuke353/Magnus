@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PieAllocation } from '~/utils/portfolio/types';
 
 export const action: ActionFunction = async ({ request }) => {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
   const userId = user.id;
   
   if (request.method === 'POST') {
@@ -68,7 +68,7 @@ export const action: ActionFunction = async ({ request }) => {
 };
 
 export const loader = async ({ request }: { request: Request }) => {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
   const userId = user.id;
   
   try {

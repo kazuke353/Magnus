@@ -18,7 +18,7 @@ import { errorResponse } from "~/utils/error-handler";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const chatHistory = null;
     
     return json({ user, chatHistory });
@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const formData = await request.formData();
     const action = formData.get("_action");
     

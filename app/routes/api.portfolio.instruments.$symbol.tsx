@@ -4,7 +4,7 @@ import { requireAuthentication } from '~/services/auth.server'; // Use requireAu
 import { getInstrumentDetails } from '~/utils/portfolio/instruments';
 
 export const loader: LoaderFunction = async ({ request, params }) => {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
   const userId = user.id;
   const { symbol } = params;
   

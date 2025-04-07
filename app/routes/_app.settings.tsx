@@ -20,13 +20,13 @@ const SettingsSchema = z.object({
 });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
   
   return json({ user });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
 
   const formData = await request.formData();
   const country = formData.get("country") as string || '';

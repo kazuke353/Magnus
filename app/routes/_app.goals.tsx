@@ -15,7 +15,7 @@ import { errorResponse, createApiError } from "~/utils/error-handler";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     
     // Get user's goals
     const goals = await getUserGoals(user.id);
@@ -49,7 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const formData = await request.formData();
     const actionType = formData.get("_action") as string;
     

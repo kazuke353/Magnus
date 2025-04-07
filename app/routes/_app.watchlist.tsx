@@ -20,7 +20,7 @@ interface WatchlistLoaderData {
 export const loader = async ({ request }: LoaderFunctionArgs): Promise<Response | TypedResponse<WatchlistLoaderData>> => { // Use LoaderFunctionArgs and add return type
   try {
     // Use requireAuthentication to get the user object
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const userId = user.id; // Get userId from the authenticated user
     const userCurrency = user.settings?.currency || 'USD'; // Get currency from user settings
 

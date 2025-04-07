@@ -23,7 +23,7 @@ interface WatchlistApiActionData {
 // --- Refactored Loader Function ---
 export const loader: LoaderFunction = async ({ request }: LoaderFunctionArgs): Promise<TypedResponse<WatchlistApiLoaderData>> => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const userId = user.id;
 
     // Get watchlist from the database service
@@ -46,7 +46,7 @@ export const loader: LoaderFunction = async ({ request }: LoaderFunctionArgs): P
 // --- Refactored Action Function ---
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs): Promise<TypedResponse<WatchlistApiActionData>> => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     const userId = user.id;
 
     if (request.method !== 'POST') {

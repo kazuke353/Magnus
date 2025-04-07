@@ -4,7 +4,7 @@ import { requireAuthentication } from '~/services/auth.server'; // Use requireAu
 import { searchInstruments } from '~/utils/portfolio/instruments';
 
 export const loader: LoaderFunction = async ({ request }) => {
-  const user = await requireAuthentication(request, "/login");
+  const user = await requireAuthentication(request);
   const userId = user.id;
   
   try {

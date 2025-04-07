@@ -34,7 +34,7 @@ interface PortfolioLoaderData {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     // Only fetch the user, which is fast
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     // Return only the user data in the expected structure
     return json({ user, error: null }); // Ensure structure matches PortfolioLoaderData
 
@@ -56,7 +56,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // --- Action Function remains unchanged ---
 export const action = async ({ request }: ActionFunctionArgs) => {
      try {
-        const user = await requireAuthentication(request, "/login");
+        const user = await requireAuthentication(request);
         const formData = await request.formData();
         const actionType = formData.get("_action");
 
@@ -354,7 +354,7 @@ export default function Portfolio() {
     if (!portfolioData || !portfolioData.overallSummary || !portfolioData.overallSummary.overallSummary) {
       return null;
     }
-    
+
     return {
       totalInvested: portfolioData.overallSummary.overallSummary.totalInvestedOverall || 0,
       totalResult: portfolioData.overallSummary.overallSummary.totalResultOverall || 0,

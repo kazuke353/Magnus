@@ -2,8 +2,19 @@ import axios from 'axios';
 import { format, subYears, parseISO } from 'date-fns';
 import yahooFinance from 'yahoo-finance2';
 
-// Suppress Yahoo Finance notices
-yahooFinance.suppressNotices(['yahooSurvey']);
+// Define your custom logger object
+const myLogger = {
+  info: (...args: any[]) => console.log('[YF2 INFO]', ...args),
+  warn: (...args: any[]) => console.warn('[YF2 WARN]', ...args),
+  error: (...args: any[]) => console.error('[YF2 ERROR]', ...args),
+  // Implement the debug function to see debug messages
+  debug: (...args: any[]) => console.log('[YF2 DEBUG]', ...args),
+};
+
+// Set the custom logger globally for yahoo-finance2
+yahooFinance.setGlobalConfig({
+  logger: myLogger,
+});
 
 export interface Benchmark {
   name: string;

@@ -7,20 +7,18 @@ import { getUserTasks, Task } from "~/db/tasks.server";
 import { getUserGoals, Goal } from "~/db/goals.server";
 import { PerformanceMetrics } from "~/utils/portfolio_fetcher";
 import Card from "~/components/Card";
-import DashboardSkeleton from "~/components/DashboardSkeleton";
 import PortfolioSummary from "~/components/PortfolioSummary";
 import GoalTracker from "~/components/GoalTracker";
 import ChatPromo from "~/components/ChatPromo";
 import { showToast } from "~/components/ToastContainer";
-import { FiCalendar, FiDollarSign, FiTarget, FiLoader } from "react-icons/fi";
-import { formatDate } from "~/utils/date";
+import { formatDate } from "~/utils/formatters";
 import { errorResponse, createApiError } from "~/utils/error-handler";
 
 
 // --- Loader definition remains the same as the previous corrected version ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await requireAuthentication(request, "/login");
+    const user = await requireAuthentication(request);
     if (!user) {
       return json({ error: "Authentication required", user: null, upcomingTasks: [], goals: [] }, { status: 401 });
     }
