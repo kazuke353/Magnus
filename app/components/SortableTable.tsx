@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { FiChevronUp, FiChevronDown, FiSearch, FiFilter, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 interface Column<T> {
-  key: keyof T | string;
+  key: keyof T | string; // This should be unique per column
   header: string;
   render?: (item: T) => React.ReactNode;
   sortable?: boolean;
@@ -16,6 +16,8 @@ interface SortableTableProps<T> {
   itemsPerPage?: number;
   className?: string;
   emptyMessage?: string;
+  // Add a prop to get a unique key for each data item
+  keyField: keyof T;
 }
 
 export default function SortableTable<T>({
@@ -23,13 +25,14 @@ export default function SortableTable<T>({
   columns,
   itemsPerPage = 10,
   className = '',
-  emptyMessage = 'No data available'
+  emptyMessage = 'No data available',
+  keyField // Destructure the new prop
 }: SortableTableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof T | string;
     direction: 'asc' | 'desc';
   } | null>(null);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [filterText, setFilterText] = useState('');
   const [filterColumn, setFilterColumn] = useState<keyof T | string | null>(null);
@@ -42,11 +45,11 @@ export default function SortableTable<T>({
   // Handle sorting
   const handleSort = (key: keyof T | string) => {
     let direction: 'asc' | 'desc' = 'asc';
-    
+
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    
+
     setSortConfig({ key, direction });
   };
 
@@ -54,12 +57,12 @@ export default function SortableTable<T>({
   const sortedAndFilteredData = useMemo(() => {
     // First apply filtering
     let filteredData = [...data];
-    
+
     if (filterText && filterColumn) {
       filteredData = filteredData.filter(item => {
         const value = item[filterColumn as keyof T];
         if (value === null || value === undefined) return false;
-        
+
         return String(value).toLowerCase().includes(filterText.toLowerCase());
       });
     } else if (filterText) {
@@ -68,52 +71,52 @@ export default function SortableTable<T>({
         return filterableColumns.some(column => {
           const value = item[column.key as keyof T];
           if (value === null || value === undefined) return false;
-          
+
           return String(value).toLowerCase().includes(filterText.toLowerCase());
         });
       });
     }
-    
+
     // Then apply sorting
     if (sortConfig) {
       const { key, direction } = sortConfig;
       const column = columns.find(col => col.key === key);
-      
+
       filteredData.sort((a, b) => {
         // Use custom sort function if provided
         if (column?.sortFn) {
-          return direction === 'asc' 
-            ? column.sortFn(a, b) 
+          return direction === 'asc'
+            ? column.sortFn(a, b)
             : column.sortFn(b, a);
         }
-        
+
         // Default sorting logic
         const aValue = a[key as keyof T];
         const bValue = b[key as keyof T];
-        
+
         if (aValue === bValue) return 0;
-        
+
         // Handle different types
         if (typeof aValue === 'number' && typeof bValue === 'number') {
           return direction === 'asc' ? aValue - bValue : bValue - aValue;
         }
-        
+
         if (aValue instanceof Date && bValue instanceof Date) {
-          return direction === 'asc' 
-            ? aValue.getTime() - bValue.getTime() 
+          return direction === 'asc'
+            ? aValue.getTime() - bValue.getTime()
             : bValue.getTime() - aValue.getTime();
         }
-        
+
         // Default string comparison
-        const aString = String(aValue).toLowerCase();
-        const bString = String(bValue).toLowerCase();
-        
-        return direction === 'asc' 
-          ? aString.localeCompare(bString) 
+        const aString = String(aValue ?? '').toLowerCase(); // Handle null/undefined
+        const bString = String(bValue ?? '').toLowerCase(); // Handle null/undefined
+
+        return direction === 'asc'
+          ? aString.localeCompare(bString)
           : bString.localeCompare(aString);
       });
     }
-    
+
     return filteredData;
   }, [data, sortConfig, filterText, filterColumn, filterableColumns, columns]);
 
@@ -145,18 +148,19 @@ export default function SortableTable<T>({
             onChange={(e) => setFilterText(e.target.value)}
           />
         </div>
-        
+
         {filterableColumns.length > 0 && (
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <FiFilter className="h-5 w-5 text-gray-400" />
             </div>
             <select
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="block w-full pl-10 pr-8 py-2 border border-gray-300 rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" // Added pr-8 for arrow space
               value={filterColumn as string || ''}
               onChange={(e) => setFilterColumn(e.target.value || null)}
             >
               <option value="">All Columns</option>
+              {/* Add key prop to option */}
               {filterableColumns.map((column) => (
                 <option key={column.key as string} value={column.key as string}>
                   {column.header}
@@ -166,15 +170,16 @@ export default function SortableTable<T>({
           </div>
         )}
       </div>
-      
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className={`min-w-full divide-y divide-gray-200 dark:divide-gray-700 ${className}`}>
           <thead className="bg-gray-100 dark:bg-gray-900">
             <tr>
+              {/* Add key prop to th */}
               {columns.map((column) => (
                 <th
-                  key={column.key as string}
+                  key={column.key as string} // <-- KEY PROP ADDED HERE
                   scope="col"
                   className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider ${
                     column.sortable !== false ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''
@@ -183,9 +188,8 @@ export default function SortableTable<T>({
                 >
                   <div className="flex items-center">
                     <span>{column.header}</span>
-                    {column.sortable !== false && sortConfig && sortConfig.key === column.key && ( // Check sortConfig is truthy AND the key matches
+                    {column.sortable !== false && sortConfig && sortConfig.key === column.key && (
                       <span className="ml-1">
-                        {/* Now it's safe to access sortConfig.direction */}
                         {sortConfig.direction === 'asc' ? (
                           <FiChevronUp className="h-4 w-4" />
                         ) : (
@@ -200,11 +204,13 @@ export default function SortableTable<T>({
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {paginatedData.length > 0 ? (
-              paginatedData.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+              paginatedData.map((item) => (
+                // Add key prop to tr using the keyField prop
+                <tr key={item[keyField] as React.Key} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   {columns.map((column) => (
+                    // Add key prop to td using column key
                     <td key={column.key as string} className="px-4 py-3 whitespace-nowrap text-sm">
-                      {column.render ? column.render(item) : String(item[column.key as keyof T] || '')}
+                      {column.render ? column.render(item) : String(item[column.key as keyof T] ?? '')}
                     </td>
                   ))}
                 </tr>
@@ -222,7 +228,7 @@ export default function SortableTable<T>({
           </tbody>
         </table>
       </div>
-      
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
@@ -232,7 +238,7 @@ export default function SortableTable<T>({
               disabled={currentPage === 1}
               className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
                 currentPage === 1
-                  ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                  ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                   : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
@@ -243,7 +249,7 @@ export default function SortableTable<T>({
               disabled={currentPage === totalPages}
               className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
                 currentPage === totalPages
-                  ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                  ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                   : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
@@ -267,7 +273,7 @@ export default function SortableTable<T>({
                   disabled={currentPage === 1}
                   className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
                     currentPage === 1
-                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -279,18 +285,18 @@ export default function SortableTable<T>({
                   disabled={currentPage === 1}
                   className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
                     currentPage === 1
-                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
                   <span className="sr-only">Previous</span>
                   <FiChevronLeft className="h-5 w-5" />
                 </button>
-                
+
                 {/* Page numbers */}
                 {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                   let pageNumber;
-                  
+
                   if (totalPages <= 5) {
                     pageNumber = i + 1;
                   } else if (currentPage <= 3) {
@@ -300,10 +306,10 @@ export default function SortableTable<T>({
                   } else {
                     pageNumber = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <button
-                      key={pageNumber}
+                      key={pageNumber} // <-- KEY PROP ADDED HERE
                       onClick={() => setCurrentPage(pageNumber)}
                       className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
                         currentPage === pageNumber
@@ -315,13 +321,13 @@ export default function SortableTable<T>({
                     </button>
                   );
                 })}
-                
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                   className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
                     currentPage === totalPages
-                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -333,7 +339,7 @@ export default function SortableTable<T>({
                   disabled={currentPage === totalPages}
                   className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
                     currentPage === totalPages
-                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800'
+                      ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >

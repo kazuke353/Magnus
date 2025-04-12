@@ -21,6 +21,13 @@ export default function handleRequest(
   remixContext: EntryContext,
   loadContext: AppLoadContext
 ) {
+  // Add security headers
+  responseHeaders.set("X-Frame-Options", "DENY"); // Prevent clickjacking
+  responseHeaders.set("X-Content-Type-Options", "nosniff");
+  responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Content-Security-Policy is more complex and needs careful configuration based on your app's needs.
+  // Example (restrictive): responseHeaders.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;");
+
   return isbot(request.headers.get("user-agent") || "")
     ? handleBotRequest(
         request,

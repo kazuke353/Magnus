@@ -34,6 +34,7 @@ export interface PieInstrument {
   currentValue: number;
   resultValue: number;
   dividendYield: number;
+  performance_1day?: number | null; // Added 1-day performance
   performance_1week?: number | null;
   performance_1month?: number | null;
   performance_3months?: number | null;
@@ -61,6 +62,25 @@ export interface OverallSummary {
   }
 }
 
+export interface AllocationAnalysis {
+  targetAllocation: Record<string, { value: number; percent: number }>;
+  currentAllocation: Record<string, { value: number; percent: number }>;
+  allocationDifferences: Record<string, string>; // Keep as string for formatted output
+  estimatedAnnualDividend?: number;
+}
+
+export interface PerformanceMetrics {
+  portfolio: PieData[] | null;
+  overallSummary: OverallSummary | null;
+  allocationAnalysis?: AllocationAnalysis;
+  rebalanceInvestmentForTarget?: Record<string, { current: number; target: number; difference: number }> | null;
+  freeCashAvailable?: number;
+  benchmarks?: Benchmark[];
+  fetchDate: string;
+  plannedInvestmentExpectedDepositDate?: Record<string, string>; // Added optional field
+}
+
+
 export interface InstrumentSearchResult {
   symbol: string;
   name: string;
@@ -80,3 +100,28 @@ export interface PieAllocation {
   pieName: string;
   targetAllocation: number;
 }
+
+export interface Benchmark {
+  name: string;
+  returnPercentage: number;
+  description?: string;
+  lastUpdated?: string;
+}
+
+// --- API Client Types ---
+export interface ApiRequestOptions {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers?: Record<string, string>;
+  delay?: number;
+  retries?: number;
+}
+
+export interface CacheEntry {
+  data: AxiosResponse;
+  timestamp: number;
+}
+
+// Add AxiosResponse type if not already globally available
+// You might need to install axios types: npm install --save-dev @types/axios
+import { AxiosResponse } from 'axios';

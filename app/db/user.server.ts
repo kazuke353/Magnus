@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { users } from './schema';
 import { eq } from 'drizzle-orm';
 
+// Increase bcrypt salt rounds for better security
+const SALT_ROUNDS = 12;
+
 export async function createUser(
   email: string,
   password: string,
@@ -12,7 +15,8 @@ export async function createUser(
   lastName: string = ''
 ): Promise<User> {
   const db = getDb();
-  const passwordHash = bcrypt.hashSync(password, 10);
+  // Use the increased salt rounds
+  const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
   const now = new Date().toISOString();
   const userId = uuidv4();
 
@@ -60,13 +64,16 @@ export async function getUserById(id: string): Promise<User | null> {
     if (!result.length) return null;
 
     const user = result[0];
+    // Ensure settings is parsed if stored as JSON string (depends on Drizzle/driver)
+    const settings = typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings;
+
     return {
       id: user.id,
       email: user.email,
       passwordHash: user.passwordHash,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      settings: user.settings,
+      settings: settings, // Use parsed settings
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
     };
@@ -87,13 +94,16 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     if (!result.length) return null;
 
     const user = result[0];
+     // Ensure settings is parsed
+    const settings = typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings;
+
     return {
       id: user.id,
       email: user.email,
       passwordHash: user.passwordHash,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      settings: user.settings,
+      settings: settings, // Use parsed settings
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
     };
@@ -109,7 +119,8 @@ export async function verifyLogin(email: string, password: string): Promise<User
     return null;
   }
 
-  const isValid = bcrypt.compareSync(password, user.passwordHash);
+  // Use bcrypt.compare for secure comparison
+  const isValid = await bcrypt.compare(password, user.passwordHash);
   if (!isValid) {
     return null;
   }
@@ -140,7 +151,7 @@ export async function updateUserSettings(
     // Update user in database
     await db.update(users)
       .set({
-        settings: updatedSettings,
+        settings: updatedSettings, // Drizzle handles JSON stringification
         updatedAt: now
       })
       .where(eq(users.id, userId));

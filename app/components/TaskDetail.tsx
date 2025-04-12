@@ -4,6 +4,7 @@ import Button from './Button';
 import { FiEdit2, FiTrash2, FiCheck, FiX, FiCalendar, FiDollarSign, FiTag, FiFlag } from 'react-icons/fi';
 import { formatCurrency } from '~/utils/formatters';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize'; // Import rehype-sanitize
 
 interface TaskDetailProps {
   task: Task;
@@ -27,7 +28,7 @@ export default function TaskDetail({
     medium: 'bg-yellow-100 dark:bg-yellow-900 dark:bg-opacity-20 text-yellow-800 dark:text-yellow-300',
     high: 'bg-red-100 dark:bg-red-900 dark:bg-opacity-20 text-red-800 dark:text-red-300'
   };
-  
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sticky top-4">
       <div className="flex justify-between items-start mb-4">
@@ -41,17 +42,20 @@ export default function TaskDetail({
           <FiX size={20} />
         </button>
       </div>
-      
+
       <div className="space-y-4">
         {task.description && (
           <div>
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
             <div className="mt-1 prose prose-sm dark:prose-invert max-w-none text-gray-900 dark:text-gray-100">
-              <ReactMarkdown>{task.description}</ReactMarkdown>
+              {/* Add rehypePlugins to sanitize markdown */}
+              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+                {task.description}
+              </ReactMarkdown>
             </div>
           </div>
         )}
-        
+
         <div className="grid grid-cols-2 gap-4">
           {task.dueDate && (
             <div className="flex items-start">
@@ -64,7 +68,7 @@ export default function TaskDetail({
               </div>
             </div>
           )}
-          
+
           {task.category && (
             <div className="flex items-start">
               <FiTag className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
@@ -74,7 +78,7 @@ export default function TaskDetail({
               </div>
             </div>
           )}
-          
+
           <div className="flex items-start">
             <FiFlag className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
             <div>
@@ -84,7 +88,7 @@ export default function TaskDetail({
               </span>
             </div>
           </div>
-          
+
           {task.amount !== null && (
             <div className="flex items-start">
               <FiDollarSign className="mt-1 mr-2 text-gray-500 dark:text-gray-400" />
@@ -96,7 +100,7 @@ export default function TaskDetail({
               </div>
             </div>
           )}
-          
+
           <div className="col-span-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
             <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${
@@ -109,7 +113,7 @@ export default function TaskDetail({
           </div>
         </div>
       </div>
-      
+
       <div className="mt-6 flex justify-end space-x-3">
         <Button
           variant="outline"
@@ -127,7 +131,7 @@ export default function TaskDetail({
             </>
           )}
         </Button>
-        
+
         <Button
           variant="outline"
           onClick={() => onEdit(task)}
@@ -135,7 +139,7 @@ export default function TaskDetail({
           <FiEdit2 className="mr-2" />
           Edit
         </Button>
-        
+
         <Button
           variant="danger"
           onClick={() => onDelete(task.id)}

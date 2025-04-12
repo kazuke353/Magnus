@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react"; // Added useEffect, useRef
 import { FiUser, FiCpu, FiCopy, FiCheck } from "react-icons/fi";
 import { marked } from "marked";
+import DOMPurify from 'isomorphic-dompurify'; // Import DOMPurify
 
 interface ChatMessageProps {
   message: {
@@ -13,6 +14,7 @@ interface ChatMessageProps {
 
 export default function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null); // Ref for the content div
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(message.content);
@@ -20,15 +22,27 @@ export default function ChatMessage({ message }: ChatMessageProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Parse markdown for assistant messages
-  const formattedContent = message.role === "assistant" 
-    ? { __html: marked.parse(message.content) } 
-    : { __html: message.content };
+  // Sanitize and set HTML for assistant messages
+  useEffect(() => {
+    if (message.role === 'assistant' && contentRef.current) {
+      try {
+        // Parse markdown first
+        const rawHtml = marked.parse(message.content || '');
+        // Sanitize the parsed HTML
+        const cleanHtml = DOMPurify.sanitize(rawHtml);
+        contentRef.current.innerHTML = cleanHtml;
+      } catch (error) {
+        console.error("Error processing message content:", error);
+        // Fallback to text content if parsing/sanitizing fails
+        contentRef.current.textContent = message.content || '';
+      }
+    }
+  }, [message.content, message.role]); // Rerun when content or role changes
 
   return (
     <div className={`p-4 mb-4 rounded-lg flex ${
-      message.role === "user" 
-        ? "bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20" 
+      message.role === "user"
+        ? "bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20"
         : "bg-gray-50 dark:bg-gray-800"
     }`}>
       <div className="flex-shrink-0 mr-4">
@@ -49,21 +63,23 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             {new Date(message.timestamp).toLocaleTimeString()}
           </div>
         </div>
-        
+
         {message.role === "assistant" ? (
-          <div 
+          // Use the ref to render sanitized HTML
+          <div
+            ref={contentRef}
             className="prose dark:prose-invert prose-sm max-w-none"
-            dangerouslySetInnerHTML={formattedContent}
           />
         ) : (
+          // User messages are treated as plain text (no markdown parsing needed)
           <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">
             {message.content}
           </div>
         )}
       </div>
-      
+
       {message.role === "assistant" && (
-        <button 
+        <button
           onClick={copyToClipboard}
           className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
           title="Copy to clipboard"

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { formatDateTime } from "~/utils/date";
 import SourcesList from "~/components/SourcesList";
 import { marked } from 'marked';
+import DOMPurify from 'isomorphic-dompurify'; // Import DOMPurify
 
 interface Source {
   title: string;
@@ -17,26 +18,31 @@ interface ChatStreamMessageProps {
   isStreaming?: boolean;
 }
 
-const ChatStreamMessage: React.FC<ChatStreamMessageProps> = ({ 
-  content, 
-  role, 
-  createdAt, 
+const ChatStreamMessage: React.FC<ChatStreamMessageProps> = ({
+  content,
+  role,
+  createdAt,
   sources = [],
   isStreaming = false
 }) => {
   const isUser = role === 'user';
   const contentRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (contentRef.current && !isUser) {
       try {
-        contentRef.current.innerHTML = marked.parse(content || '');
+        // Parse markdown first
+        const rawHtml = marked.parse(content || '');
+         // Sanitize the parsed HTML
+        const cleanHtml = DOMPurify.sanitize(rawHtml);
+        contentRef.current.innerHTML = cleanHtml;
       } catch (error) {
-        console.error("Error parsing markdown:", error);
+        console.error("Error processing message content:", error);
+        // Fallback to text content if parsing/sanitizing fails
         contentRef.current.textContent = content || '';
       }
     }
-  }, [content, isUser]);
+  }, [content, isUser]); // Rerun when content changes
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
@@ -45,11 +51,12 @@ const ChatStreamMessage: React.FC<ChatStreamMessageProps> = ({
           <div className="whitespace-pre-line">{content}</div>
         ) : (
           <>
-            <div 
-              ref={contentRef} 
+            {/* Use the ref to render sanitized HTML */}
+            <div
+              ref={contentRef}
               className="prose dark:prose-invert prose-sm max-w-none"
             ></div>
-            
+
             {isStreaming && (
               <div className="flex items-center space-x-2 mt-2">
                 <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></div>
@@ -57,11 +64,11 @@ const ChatStreamMessage: React.FC<ChatStreamMessageProps> = ({
                 <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
               </div>
             )}
-            
+
             {sources && sources.length > 0 && <SourcesList sources={sources} />}
           </>
         )}
-        
+
         {createdAt && (
           <div className={`text-xs mt-1 ${isUser ? "text-blue-200" : "text-gray-500 dark:text-gray-400"}`}>
             {formatDateTime(createdAt)}

@@ -1,27 +1,30 @@
-import { makeApiRequest, API_ENDPOINTS, DEFAULT_HEADERS } from './api-client';
+import { makeApiRequest, API_ENDPOINTS } from './api-client'; // Removed DEFAULT_HEADERS import
 import { InstrumentMetadata, InstrumentSearchResult } from './types';
 import yahooFinance from 'yahoo-finance2';
 import { subDays, subYears } from 'date-fns';
 
 /**
- * Fetches all instruments metadata from the API
- * @returns Record of instruments metadata by ticker or null if fetch fails
+ * Fetches all instruments metadata from the API for a specific user.
+ * @param userId The ID of the user whose API key should be used.
+ * @returns Record of instruments metadata by ticker or null if fetch fails.
  */
-export async function getAllInstrumentsMetadata(): Promise<Record<string, InstrumentMetadata> | null> {
+export async function getAllInstrumentsMetadata(userId: string): Promise<Record<string, InstrumentMetadata> | null> { // Add userId parameter
+  console.log(`[getAllInstrumentsMetadata] Fetching for userId: ${userId}`); // DEBUG LOG
   const response = await makeApiRequest({
     url: API_ENDPOINTS.INSTRUMENTS_METADATA,
-    headers: DEFAULT_HEADERS
+    userId: userId // Pass userId to makeApiRequest
+    // Removed static DEFAULT_HEADERS
   });
 
   if (!response) {
-    console.log("Failed to fetch instruments metadata.");
+    console.error(`[getAllInstrumentsMetadata] Failed to fetch instruments metadata for userId: ${userId}.`); // DEBUG LOG
     return null;
   }
 
   try {
     const instruments = response.data as InstrumentMetadata[];
     if (!Array.isArray(instruments)) {
-      console.error("Instruments metadata is not an array");
+      console.error(`[getAllInstrumentsMetadata] Instruments metadata is not an array for userId: ${userId}`); // DEBUG LOG
       return null;
     }
 
@@ -29,13 +32,14 @@ export async function getAllInstrumentsMetadata(): Promise<Record<string, Instru
     instruments.forEach(instrument => {
       metadataByTicker[instrument.ticker] = instrument;
     });
+    console.log(`[getAllInstrumentsMetadata] Successfully fetched metadata for ${Object.keys(metadataByTicker).length} instruments for userId: ${userId}`); // DEBUG LOG
     return metadataByTicker;
   } catch (e: any) {
-    console.error(`Error parsing instruments metadata: ${e.message}`);
+    console.error(`[getAllInstrumentsMetadata] Error parsing instruments metadata for userId: ${userId}: ${e.message}`); // DEBUG LOG
     try {
-      console.error(`Response Content: ${JSON.stringify(response.data)}`);
-    } catch (e) {
-      console.error("No response available");
+      console.error(`[getAllInstrumentsMetadata] Response Content: ${JSON.stringify(response.data)}`);
+    } catch (parseErr) {
+      console.error("[getAllInstrumentsMetadata] Could not parse error response content.");
     }
     return null;
   }
