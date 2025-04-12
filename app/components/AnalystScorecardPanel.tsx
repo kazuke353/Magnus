@@ -1,75 +1,80 @@
-    import Card from './Card';
-    import { FiCheckCircle, FiXCircle, FiMinusCircle } from 'react-icons/fi';
+import Card from './Card';
+import { FiTrendingUp, FiTrendingDown, FiMinusCircle, FiBarChart2 } from 'react-icons/fi'; // Updated icons
+import { RecommendationTrend } from '~/utils/portfolio/types'; // Import the correct type
 
-    interface AnalystStats {
-      beat: number;
-      miss: number;
-      push: number; // Assuming 'push' means met estimates
-    }
+interface AnalystScorecardPanelProps {
+  // Change the prop to accept recommendationTrend data
+  recommendationTrend?: RecommendationTrend[];
+}
 
-    interface AnalystScorecardPanelProps {
-      data?: {
-        overallBeatPercent?: number;
-        oneYearStats?: AnalystStats;
-        twoYearStats?: AnalystStats;
-      };
-    }
+// Helper function to get the latest trend data
+const getLatestTrend = (trends?: RecommendationTrend[]): RecommendationTrend | null => {
+  if (!trends || trends.length === 0) return null;
+  // Assuming '0m' represents the latest trend
+  return trends.find(t => t.period === '0m') || trends[trends.length - 1];
+};
 
-    export default function AnalystScorecardPanel({ data }: AnalystScorecardPanelProps) {
-      if (!data) {
-        return (
-          <Card title="Analyst Scorecard">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Data not available.</p>
-          </Card>
-        );
-      }
+export default function AnalystScorecardPanel({ recommendationTrend }: AnalystScorecardPanelProps) {
+  const latestTrend = getLatestTrend(recommendationTrend);
 
-      const renderStats = (stats?: AnalystStats) => {
-        if (!stats) return <span className="text-gray-500">-</span>;
-        const total = stats.beat + stats.miss + stats.push;
-        if (total === 0) return <span className="text-gray-500">-</span>;
-        const beatPercent = ((stats.beat / total) * 100).toFixed(0);
-        const missPercent = ((stats.miss / total) * 100).toFixed(0);
-        const pushPercent = ((stats.push / total) * 100).toFixed(0);
+  if (!latestTrend) {
+    return (
+      <Card title="Analyst Recommendations">
+        <p className="text-sm text-gray-500 dark:text-gray-400 p-4">Recommendation data not available.</p>
+      </Card>
+    );
+  }
 
-        return (
-          <div className="flex space-x-2 items-center">
-            <span className="flex items-center text-green-600 dark:text-green-400" title="Beat Estimates">
-              <FiCheckCircle className="mr-1" /> {beatPercent}%
+  const totalAnalysts = latestTrend.strongBuy + latestTrend.buy + latestTrend.hold + latestTrend.sell + latestTrend.strongSell;
+  const buyPercent = totalAnalysts > 0 ? ((latestTrend.strongBuy + latestTrend.buy) / totalAnalysts) * 100 : 0;
+  const holdPercent = totalAnalysts > 0 ? (latestTrend.hold / totalAnalysts) * 100 : 0;
+  const sellPercent = totalAnalysts > 0 ? ((latestTrend.sell + latestTrend.strongSell) / totalAnalysts) * 100 : 0;
+
+  return (
+    <Card title="Analyst Recommendations">
+      <div className="p-4 space-y-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400">Based on {totalAnalysts} analysts (Latest Trend)</p>
+        <div className="space-y-2">
+          {/* Buy Ratings */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center">
+              <FiTrendingUp className="mr-1" /> Buy / Strong Buy
             </span>
-            <span className="flex items-center text-red-600 dark:text-red-400" title="Missed Estimates">
-              <FiXCircle className="mr-1" /> {missPercent}%
-            </span>
-             <span className="flex items-center text-gray-500 dark:text-gray-400" title="Met Estimates">
-              <FiMinusCircle className="mr-1" /> {pushPercent}%
+            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+              {buyPercent.toFixed(0)}% ({latestTrend.strongBuy + latestTrend.buy})
             </span>
           </div>
-        );
-      };
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${buyPercent}%` }}></div>
+          </div>
 
-      return (
-        <Card title="Analyst Scorecard">
-          <dl className="space-y-3 text-sm">
-            <div className="flex justify-between items-center">
-              <dt className="text-gray-500 dark:text-gray-400">Overall Beat %</dt>
-              <dd className="font-medium text-lg text-green-600 dark:text-green-400">
-                {data.overallBeatPercent ? `${data.overallBeatPercent.toFixed(0)}%` : '-'}
-              </dd>
-            </div>
-            <div className="flex justify-between items-center">
-              <dt className="text-gray-500 dark:text-gray-400">1-Year Fwd</dt>
-              <dd className="font-medium text-gray-900 dark:text-gray-100">
-                {renderStats(data.oneYearStats)}
-              </dd>
-            </div>
-            <div className="flex justify-between items-center">
-              <dt className="text-gray-500 dark:text-gray-400">2-Year Fwd</dt>
-              <dd className="font-medium text-gray-900 dark:text-gray-100">
-                {renderStats(data.twoYearStats)}
-              </dd>
-            </div>
-          </dl>
-           <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Based on analyst earnings estimates.</p>
-        </Card>
-      );
-    }
+          {/* Hold Ratings */}
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
+              <FiMinusCircle className="mr-1" /> Hold
+            </span>
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {holdPercent.toFixed(0)}% ({latestTrend.hold})
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="bg-gray-500 h-2 rounded-full" style={{ width: `${holdPercent}%` }}></div>
+          </div>
+
+          {/* Sell Ratings */}
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-sm font-medium text-red-600 dark:text-red-400 flex items-center">
+              <FiTrendingDown className="mr-1" /> Sell / Strong Sell
+            </span>
+            <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+              {sellPercent.toFixed(0)}% ({latestTrend.sell + latestTrend.strongSell})
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="bg-red-500 h-2 rounded-full" style={{ width: `${sellPercent}%` }}></div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}

@@ -120,6 +120,46 @@ export interface CacheEntry {
   timestamp: number;
 }
 
-// Add AxiosResponse type if not already globally available
-// You might need to install axios types: npm install --save-dev @types/axios
+export interface HistoricalDataPoint {
+  date: string; // YYYY-MM-DD
+  open?: number;
+  high?: number;
+  low?: number;
+  close: number;
+  volume?: number;
+  adjClose?: number; // Optional adjusted close
+}
+
+export interface RecommendationTrend {
+  buy: number;
+  hold: number;
+  sell: number;
+  strongBuy: number;
+  strongSell: number;
+  period: string; // e.g., '0m'
+}
+
+export interface EarningsHistoryEntry {
+    epsActual: number | null;
+    epsEstimate: number | null;
+    epsDifference: number | null;
+    surprisePercent: number | null;
+    quarter: string; // e.g., "4q2023"
+    period: string; // e.g., "-4q"
+}
+
+// Update FetchedInstrumentDetails to include the new data structures
+export interface FetchedInstrumentDetails extends InstrumentMetadata {
+  // Basic data still inherited from InstrumentMetadata
+  previousClose?: number; // Often in summaryDetail
+  // Complex fields we attempt to fetch:
+  historicalData?: HistoricalDataPoint[];
+  recommendationTrend?: RecommendationTrend[]; // Analyst recommendations
+  earningsHistory?: EarningsHistoryEntry[]; // Past earnings data
+  // Fields that are harder to get reliably / omitted:
+  analystScorecard?: any; // Replace with recommendationTrend
+  keyMetrics?: any; // Omit for now, complex to structure consistently
+  yearlyHighLow?: any; // 52-week high/low is already included
+}
+
 import { AxiosResponse } from 'axios';

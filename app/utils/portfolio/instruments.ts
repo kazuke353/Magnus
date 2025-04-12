@@ -1,7 +1,181 @@
 import { makeApiRequest, API_ENDPOINTS } from './api-client'; // Removed DEFAULT_HEADERS import
-import { InstrumentMetadata, InstrumentSearchResult } from './types';
+import { InstrumentMetadata, InstrumentSearchResult, FetchedInstrumentDetails, HistoricalDataPoint, RecommendationTrend, EarningsHistoryEntry } from './types'; // Import necessary types
 import yahooFinance from 'yahoo-finance2';
-import { subDays, subYears } from 'date-fns';
+import { subDays, subYears, getYear, parseISO } from 'date-fns'; // Added getYear, parseISO
+
+// --- Helper Interfaces for Yahoo Finance Response Structures ---
+// These are approximations based on common fields, adjust as needed by inspecting actual API responses.
+interface YFQuoteSummary {
+  price?: {
+    shortName?: string;
+    longName?: string;
+    regularMarketPrice?: number;
+    // ... other price fields
+  };
+  summaryDetail?: {
+    previousClose?: number;
+    marketCap?: number;
+    volume?: number; // Added volume
+    dividendYield?: number;
+    trailingPE?: number;
+    beta?: number;
+    fiftyTwoWeekHigh?: number;
+    fiftyTwoWeekLow?: number;
+    // ... other summary fields
+  };
+  defaultKeyStatistics?: {
+    enterpriseValue?: number;
+    profitMargins?: number;
+    floatShares?: number;
+    sharesOutstanding?: number;
+    sharesShort?: number;
+    sharesShortPriorMonth?: number;
+    sharesShortPreviousMonthDate?: number; // Timestamp
+    dateShortInterest?: number; // Timestamp
+    sharesPercentSharesOut?: number;
+    heldPercentInsiders?: number;
+    heldPercentInstitutions?: number;
+    shortRatio?: number;
+    shortPercentOfFloat?: number;
+    beta?: number;
+    morningStarOverallRating?: any;
+    morningStarRiskRating?: any;
+    category?: string;
+    bookValue?: number;
+    priceToBook?: number;
+    annualReportExpenseRatio?: any;
+    lastFiscalYearEnd?: number; // Timestamp
+    nextFiscalYearEnd?: number; // Timestamp
+    mostRecentQuarter?: number; // Timestamp
+    earningsQuarterlyGrowth?: number;
+    netIncomeToCommon?: number;
+    trailingEps?: number;
+    forwardEps?: number;
+    pegRatio?: number;
+    lastSplitFactor?: string;
+    lastSplitDate?: number; // Timestamp
+    enterpriseToRevenue?: number;
+    enterpriseToEbitda?: number;
+    '52WeekChange'?: number;
+    SandP52WeekChange?: number;
+    lastDividendValue?: number;
+    lastDividendDate?: number; // Timestamp
+    forwardPE?: number;
+    sector?: string;
+    industry?: string;
+    // ... other key stats
+  };
+  financialData?: {
+    currentPrice?: number;
+    targetHighPrice?: number;
+    targetLowPrice?: number;
+    targetMeanPrice?: number;
+    recommendationMean?: number;
+    recommendationKey?: string;
+    numberOfAnalystOpinions?: number;
+    totalCash?: number;
+    totalCashPerShare?: number;
+    ebitda?: number;
+    totalDebt?: number;
+    quickRatio?: number;
+    currentRatio?: number;
+    totalRevenue?: number;
+    debtToEquity?: number;
+    revenuePerShare?: number;
+    returnOnAssets?: number;
+    returnOnEquity?: number;
+    grossProfits?: number;
+    freeCashflow?: number;
+    operatingCashflow?: number;
+    earningsGrowth?: number;
+    revenueGrowth?: number;
+    grossMargins?: number;
+    ebitdaMargins?: number;
+    operatingMargins?: number;
+    profitMargins?: number;
+    financialCurrency?: string;
+    // ... other financial data
+  };
+  calendarEvents?: {
+     dividendDate?: number; // Timestamp
+     earnings?: {
+         earningsDate?: number[]; // Array of timestamps
+         earningsAverage?: number;
+         earningsLow?: number;
+         earningsHigh?: number;
+         revenueAverage?: number;
+         revenueLow?: number;
+         revenueHigh?: number;
+     }
+     // ... other calendar events
+  };
+  earningsHistory?: {
+    history?: Array<{
+      epsActual?: number;
+      epsEstimate?: number;
+      epsDifference?: number;
+      surprisePercent?: number;
+      quarter?: string; // e.g., "4q2023" or timestamp
+      period?: string; // e.g., "-4q"
+    }>;
+    // ... other earnings history fields
+  };
+  recommendationTrend?: {
+    trend?: Array<{
+      period?: string; // e.g., '0m', '-1m'
+      strongBuy?: number;
+      buy?: number;
+      hold?: number;
+      sell?: number;
+      strongSell?: number;
+    }>;
+    // ... other recommendation trend fields
+  };
+   summaryProfile?: {
+     sector?: string;
+     industry?: string;
+     website?: string;
+     longBusinessSummary?: string;
+     country?: string; // Added country for domicile
+     // ... other profile fields
+   };
+  // ... other potential modules
+}
+
+interface YFQuote {
+  symbol?: string;
+  shortName?: string;
+  longName?: string;
+  displayName?: string;
+  currency?: string;
+  quoteType?: string;
+  exchange?: string;
+  marketCap?: number;
+  regularMarketPrice?: number;
+  regularMarketPreviousClose?: number;
+  regularMarketVolume?: number; // Added volume
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
+  dividendYield?: number;
+  // ... other quote fields
+}
+
+interface YFChartQuote {
+  date: Date;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  volume?: number | null;
+  adjclose?: number | null;
+}
+
+interface YFChartResult {
+  meta: any;
+  quotes: YFChartQuote[];
+}
+// --- End Helper Interfaces ---
+
 
 /**
  * Fetches all instruments metadata from the API for a specific user.
@@ -375,8 +549,8 @@ export async function getInstrumentDetails(symbol: string): Promise<InstrumentMe
         currencyCode: financialData.financialCurrency || quoteData.currency || 'USD', // financialData often better
         type: quoteData.quoteType || 'EQUITY',
         addedOn: new Date().toISOString(),
-        maxOpenQuantity: 10000, // Placeholder - Should this come from T212 data?
-        minTradeQuantity: 1,    // Placeholder - Should this come from T212 data?
+        // maxOpenQuantity: 10000, // Placeholder - Should this come from T212 data?
+        // minTradeQuantity: 1,    // Placeholder - Should this come from T212 data?
         exchange: quoteData.exchange || '',
         sector: keyStats.sector || '', // sector/industry often in keyStats
         industry: keyStats.industry || '',
@@ -406,4 +580,206 @@ export async function getInstrumentDetails(symbol: string): Promise<InstrumentMe
   // If loop completes without success
   console.error(`Failed to fetch details for ${symbol} after trying all formats: [${potentialTickers.join(', ')}]`);
   return null; // <<-- Return FAILURE NULL
+}
+
+/**
+ * Calculates yearly high and low from historical data.
+ * @param historicalData Array of historical data points.
+ * @returns Object containing yearly high/low data.
+ */
+function calculateYearlyHighLow(historicalData: HistoricalDataPoint[]): Record<string, { high: number; low: number }> {
+  const yearlyData: Record<string, { highs: number[]; lows: number[] }> = {};
+
+  historicalData.forEach(point => {
+    const year = getYear(parseISO(point.date));
+    if (!yearlyData[year]) {
+      yearlyData[year] = { highs: [], lows: [] };
+    }
+    if (point.high !== undefined && point.high !== null) yearlyData[year].highs.push(point.high);
+    if (point.low !== undefined && point.low !== null) yearlyData[year].lows.push(point.low);
+  });
+
+  const result: Record<string, { high: number; low: number }> = {};
+  for (const year in yearlyData) {
+    const highs = yearlyData[year].highs;
+    const lows = yearlyData[year].lows;
+    result[year] = {
+      high: highs.length > 0 ? Math.max(...highs) : 0,
+      low: lows.length > 0 ? Math.min(...lows) : 0,
+    };
+  }
+  return result;
+}
+
+
+/**
+ * Fetches comprehensive instrument details including historical data and analyst trends.
+ * @param originalTicker The ticker symbol (potentially from Trading 212).
+ * @returns Detailed instrument data including historical points, or null if fetch fails.
+ */
+export async function getInstrumentDepthDetails(originalTicker: string): Promise<FetchedInstrumentDetails | null> {
+  const potentialTickers = formatYahooTicker(originalTicker);
+  console.log(`[getInstrumentDepthDetails] Trying tickers for "${originalTicker}": [${potentialTickers.join(', ')}]`);
+
+  if (potentialTickers.length === 0) {
+    console.error(`[getInstrumentDepthDetails] No potential Yahoo tickers generated for input: ${originalTicker}`);
+    return null;
+  }
+
+  for (const attemptTicker of potentialTickers) {
+    try {
+      console.debug(`[getInstrumentDepthDetails] Attempting deep fetch for ${attemptTicker} [Original: ${originalTicker}]`);
+
+      // Define modules for quoteSummary
+      const summaryModules: string[] = [ // Use string[] type
+        "price",
+        "summaryDetail",
+        "defaultKeyStatistics",
+        "financialData",
+        "calendarEvents",
+        "earningsHistory",
+        "recommendationTrend",
+        "summaryProfile" // Added summaryProfile
+      ];
+
+      // Fetch quote, summary, and chart data concurrently
+      const [quoteData, summaryData, chartData] = await Promise.all([
+        yahooFinance.quote(attemptTicker).catch(err => {
+            console.warn(`[getInstrumentDepthDetails] quote failed for ${attemptTicker}: ${err.message}.`);
+            return null; // Allow continuing if quote fails but others succeed
+        }),
+        yahooFinance.quoteSummary(attemptTicker, { modules: summaryModules }).catch(err => {
+          console.warn(`[getInstrumentDepthDetails] quoteSummary failed for ${attemptTicker}: ${err.message}. Continuing without summary.`);
+          return null; // Allow continuing even if summary fails
+        }),
+        yahooFinance.chart(attemptTicker, {
+          period1: subYears(new Date(), 5), // Fetch 5 years of historical data
+          period2: new Date(),
+          interval: '1d'
+        }).catch(err => {
+          console.warn(`[getInstrumentDepthDetails] chart failed for ${attemptTicker}: ${err.message}. Continuing without historical data.`);
+          return null; // Allow continuing without chart data
+        })
+      ]);
+
+      // --- Essential Data Check ---
+      // We need *some* data to proceed. Prioritize quoteSummary if available.
+      if (!quoteData && !summaryData) {
+        console.warn(`[getInstrumentDepthDetails] Both quote and quoteSummary failed for ${attemptTicker}. Skipping this ticker.`);
+        continue; // Try next ticker
+      }
+
+      // --- Process Data (Safely access potentially null objects) ---
+      const price = summaryData?.price || {};
+      const summaryDetail = summaryData?.summaryDetail || {};
+      const keyStats = summaryData?.defaultKeyStatistics || {};
+      const financialData = summaryData?.financialData || {};
+      const earningsHist = summaryData?.earningsHistory?.history || [];
+      const recommendationTrendHist = summaryData?.recommendationTrend?.trend || [];
+      const calendarEvents = summaryData?.calendarEvents || {};
+      const summaryProfile = summaryData?.summaryProfile || {}; // Added
+
+      // --- Format Historical Data ---
+      const historicalData: HistoricalDataPoint[] = chartData?.quotes?.map((q: YFChartQuote) => ({
+        date: q.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        open: q.open ?? undefined,
+        high: q.high ?? undefined,
+        low: q.low ?? undefined,
+        close: q.close ?? 0, // Provide default for close
+        volume: q.volume ?? undefined,
+        adjClose: q.adjclose ?? undefined, // Yahoo uses adjclose
+      })).filter(dp => dp.date && dp.close !== null) // Ensure date and close are valid
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort ascending
+        || []; // Default to empty array if chart data is missing
+
+
+      // --- Format Earnings History ---
+      const earningsHistory: EarningsHistoryEntry[] = earningsHist.map((eh: any) => ({
+        epsActual: eh.epsActual ?? null,
+        epsEstimate: eh.epsEstimate ?? null,
+        epsDifference: eh.epsDifference ?? null,
+        surprisePercent: eh.surprisePercent ?? null,
+        quarter: eh.quarter ? `${eh.quarter}${eh.period?.slice(-4)}` : 'N/A', // Combine quarter/year if possible
+        period: eh.period ?? 'N/A',
+      })).sort((a, b) => (a.period < b.period ? -1 : 1)); // Sort by period
+
+      // --- Format Recommendation Trend ---
+      const recommendationTrend: RecommendationTrend[] = recommendationTrendHist.map((rt: any) => ({
+        buy: rt.buy ?? 0,
+        hold: rt.hold ?? 0,
+        sell: rt.sell ?? 0,
+        strongBuy: rt.strongBuy ?? 0,
+        strongSell: rt.strongSell ?? 0,
+        period: rt.period ?? 'N/A', // e.g., '0m', '-1m'
+      }));
+
+      // --- Calculate Yearly High/Low ---
+      const yearlyHighLow = calculateYearlyHighLow(historicalData);
+
+      // --- Assemble Final Object ---
+      // Prioritize data from quoteSummary, fallback to quoteData
+      const instrumentDetails: FetchedInstrumentDetails = {
+        // Core InstrumentMetadata fields
+        ticker: originalTicker, // Use original T212 ticker
+        name: price.shortName || price.longName || quoteData?.displayName || attemptTicker,
+        currencyCode: financialData.financialCurrency || quoteData?.currency || 'USD',
+        type: quoteData?.quoteType || 'EQUITY',
+        exchange: quoteData?.exchange || '',
+        sector: keyStats.sector || summaryProfile.sector || '', // Fallback to summaryProfile
+        industry: keyStats.industry || summaryProfile.industry || '', // Fallback to summaryProfile
+        marketCap: summaryDetail.marketCap || quoteData?.marketCap || keyStats.marketCap || 0,
+        currentPrice: financialData.currentPrice ?? quoteData?.regularMarketPrice ?? price.regularMarketPrice ?? 0,
+        dividendYield: typeof summaryDetail.dividendYield === 'number' ? summaryDetail.dividendYield * 100 : 0,
+        peRatio: summaryDetail.trailingPE ?? keyStats.trailingPE ?? undefined,
+        beta: summaryDetail.beta ?? keyStats.beta ?? undefined,
+        fiftyTwoWeekHigh: summaryDetail.fiftyTwoWeekHigh ?? quoteData?.fiftyTwoWeekHigh ?? undefined,
+        fiftyTwoWeekLow: summaryDetail.fiftyTwoWeekLow ?? quoteData?.fiftyTwoWeekLow ?? undefined,
+        addedOn: new Date().toISOString(), // Placeholder
+
+        // Fetched Depth Details
+        previousClose: summaryDetail.previousClose ?? quoteData?.regularMarketPreviousClose ?? undefined,
+        historicalData: historicalData,
+        recommendationTrend: recommendationTrend,
+        earningsHistory: earningsHistory,
+        yearlyHighLow: yearlyHighLow, // Add calculated yearly high/low
+
+        // --- ADD MAPPINGS FOR PANEL DATA ---
+        // FastFactsPanel needs: blendedPE, epsValuation
+        blendedPE: summaryDetail.trailingPE ?? keyStats.trailingPE ?? undefined, // Use trailing PE as blended
+        epsValuation: financialData.targetMeanPrice ?? undefined, // Use analyst target price as EPS valuation proxy? Or forwardEps? Needs clarification.
+
+        // CompanyInfoPanel needs: gicsSubIndustry, domicile, spCreditRating, ltDebtCapital, trxVolume, spxRelated
+        // These are harder to map directly from Yahoo Finance standard modules.
+        gicsSubIndustry: keyStats.industry || summaryProfile.industry || undefined, // Use industry as proxy if available
+        domicile: summaryProfile.country || undefined, // Use country from summaryProfile if available
+        // spCreditRating: ???, // Not available
+        ltDebtCapital: financialData.debtToEquity ?? undefined, // Use Debt/Equity as proxy? Needs clarification.
+        trxVolume: summaryDetail.volume ?? quoteData?.regularMarketVolume ?? undefined,
+        // spxRelated: ???, // Not available
+
+        // AnalystScorecardPanel needs: analystScorecard object (overallBeatPercent, oneYearStats, twoYearStats)
+        // This structure isn't directly available. We can derive parts from recommendationTrend or earningsHistory,
+        // but a direct mapping is not possible without a dedicated data source or complex calculation.
+        // analystScorecard: { ... } // Placeholder - requires external data or calculation logic
+
+        // KeyMetrics (for InteractivePriceChart table) needs: eps, pe per year
+        // This requires parsing earningsHistory or finding annual EPS data, which isn't standard in quoteSummary.
+        // keyMetrics: { ... } // Placeholder - requires parsing/calculation
+      };
+
+      console.log(`[getInstrumentDepthDetails] Successfully fetched details for ${attemptTicker}`);
+      return instrumentDetails; // Return on the first successful ticker format
+
+    } catch (error: any) {
+      const errorMsg = error.message?.toLowerCase() || '';
+      if (error.name === 'ModuleError' || errorMsg.includes('not found') || errorMsg.includes('failed') || errorMsg.includes('symbol may be delisted')) {
+        console.debug(`[getInstrumentDepthDetails] Ticker format ${attemptTicker} failed (Not Found/Module Error): ${error.message}`);
+      } else {
+        console.error(`[getInstrumentDepthDetails] Unexpected error fetching details for ${attemptTicker} [Original: ${originalTicker}]: ${error.message}`, error.stack);
+      }
+    }
+  }
+
+  console.error(`[getInstrumentDepthDetails] Failed to fetch details for ${originalTicker} after trying all formats: [${potentialTickers.join(', ')}]`);
+  return null;
 }

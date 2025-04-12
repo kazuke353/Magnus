@@ -52,6 +52,7 @@
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",
     "@remix-run/dev": "^2.16.5",
+    "@types/axios": "^0.9.36",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.9",

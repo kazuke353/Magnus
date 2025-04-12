@@ -81,3 +81,7 @@ export const InstrumentSearchQuerySchema = z.object({
 export const InstrumentSymbolParamSchema = z.object({
     symbol: z.string().min(1, "Symbol required").max(20, "Symbol too long") // Validate URL param
 });
+
+export const InstrumentTickerParamSchema = z.object({
+  ticker: z.string().min(1, "Ticker required").max(20, "Ticker too long")
+});

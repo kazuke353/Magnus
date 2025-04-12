@@ -42,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     // Mock historical values (in a real app, these would come from the database)
-    const historicalValues = generateMockHistoricalValues();
+    const historicalValues = 0;
 
     // Get benchmark data if not already included in portfolio data
     let benchmarks = portfolioData.benchmarks || [];
@@ -124,26 +124,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 };
-
-// Helper function to generate mock historical values
-function generateMockHistoricalValues() {
-  const values = [];
-  const now = new Date();
-  let currentValue = 10000; // Starting value
-
-  for (let i = 365; i >= 0; i -= 7) { // Weekly data points for a year
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-
-    // Add some randomness to simulate market fluctuations
-    const randomChange = (Math.random() - 0.45) * 0.05; // -2.5% to +2.5%
-    currentValue = currentValue * (1 + randomChange);
-
-    values.push({
-      date: date.toISOString().split('T')[0],
-      value: Math.round(currentValue * 100) / 100
-    });
-  }
-
-  return values;
-}
