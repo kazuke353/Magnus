@@ -1,19 +1,153 @@
-import { useState, useRef, useEffect } from "react";
-import { FiUpload, FiDownload, FiCopy, FiX, FiCheck, FiAlertTriangle } from "react-icons/fi";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { FiUpload, FiDownload, FiCopy, FiX, FiCheck, FiAlertTriangle, FiClipboard, FiFileText } from "react-icons/fi";
 import Button from "./Button";
+import { PerformanceMetrics, PieData, PieInstrument } from "~/utils/portfolio/types"; // Import necessary types
+import { formatCurrency, formatPercentage } from "~/utils/formatters"; // Import formatters
 
 interface ImportExportModalProps {
   onClose: () => void;
   onImport: (data: any) => void;
-  portfolioData: any;
+  portfolioData: PerformanceMetrics | null; // Use the correct type
   isImporting: boolean;
+  currency?: string; // Add currency for formatting exports
 }
+
+// --- Helper Function to Prepare Export Data ---
+const prepareExportData = (
+  portfolioData: PerformanceMetrics | null,
+  selectedSections: string[],
+  format: 'json' | 'text',
+  currency: string = 'USD'
+): string => {
+  if (!portfolioData) return format === 'json' ? '{}' : 'No data available.';
+
+  const exportObj: any = {};
+
+  // 1. Overall Summary
+  if (selectedSections.includes('summary') && portfolioData.overallSummary?.overallSummary) {
+    const summary = portfolioData.overallSummary.overallSummary;
+    exportObj.summary = {
+      totalInvested: summary.totalInvestedOverall,
+      totalResult: summary.totalResultOverall,
+      returnPercentage: summary.returnPercentageOverall,
+      fetchDate: summary.fetchDate,
+      // Add estimated dividend if available in allocationAnalysis
+      estimatedAnnualDividend: portfolioData.allocationAnalysis?.estimatedAnnualDividend,
+    };
+  }
+
+  // 2. Allocation Analysis
+  if (selectedSections.includes('allocation') && portfolioData.allocationAnalysis) {
+    exportObj.allocation = portfolioData.allocationAnalysis; // Export the raw analysis object
+  }
+
+  // 3. Holdings (All Instruments)
+  if (selectedSections.includes('holdings') && portfolioData.portfolio) {
+    const allInstruments: PieInstrument[] = portfolioData.portfolio.reduce(
+      (acc: PieInstrument[], pie: PieData) => {
+        // Exclude OverallSummary pseudo-pie if it exists
+        if (pie.name !== "OverallSummary" && pie.instruments) {
+          return acc.concat(pie.instruments);
+        }
+        return acc;
+      },
+      []
+    );
+    // Group by ticker for easier viewing/processing
+    const holdingsByTicker: Record<string, any> = {};
+    allInstruments.forEach(inst => {
+      if (!holdingsByTicker[inst.ticker]) {
+        holdingsByTicker[inst.ticker] = {
+          ticker: inst.ticker,
+          name: inst.fullName || inst.ticker,
+          type: inst.type,
+          currency: inst.currencyCode,
+          totalQuantity: 0,
+          totalInvested: 0,
+          totalCurrentValue: 0,
+          totalResult: 0,
+          dividendYield: inst.dividendYield, // Assuming yield is consistent
+          performance_1day: inst.performance_1day,
+          performance_1week: inst.performance_1week,
+          performance_1month: inst.performance_1month,
+          performance_3months: inst.performance_3months,
+          performance_1year: inst.performance_1year,
+        };
+      }
+      holdingsByTicker[inst.ticker].totalQuantity += inst.ownedQuantity;
+      holdingsByTicker[inst.ticker].totalInvested += inst.investedValue;
+      holdingsByTicker[inst.ticker].totalCurrentValue += inst.currentValue;
+      holdingsByTicker[inst.ticker].totalResult += inst.resultValue;
+    });
+     // Calculate weighted average performance if needed, or just keep one instance's perf data
+    exportObj.holdings = Object.values(holdingsByTicker);
+  }
+
+  // --- Format Output ---
+  if (format === 'json') {
+    return JSON.stringify(exportObj, null, 2); // Pretty print JSON
+  } else { // format === 'text'
+    let textOutput = `Portfolio Export (${new Date().toLocaleString()})\n`;
+    textOutput += "========================================\n\n";
+
+    if (exportObj.summary) {
+      textOutput += "** Portfolio Summary **\n";
+      textOutput += `Total Invested: ${formatCurrency(exportObj.summary.totalInvested, currency)}\n`;
+      textOutput += `Total Result: ${formatCurrency(exportObj.summary.totalResult, currency)} (${formatPercentage(exportObj.summary.returnPercentage)})\n`;
+      if (exportObj.summary.estimatedAnnualDividend !== undefined) {
+        textOutput += `Est. Annual Dividend: ${formatCurrency(exportObj.summary.estimatedAnnualDividend, currency)}\n`;
+      }
+      textOutput += `Last Updated: ${exportObj.summary.fetchDate}\n\n`;
+    }
+
+    if (exportObj.allocation) {
+      textOutput += "** Allocation Analysis **\n";
+      textOutput += "Target:\n";
+      Object.entries(exportObj.allocation.targetAllocation || {}).forEach(([key, value]) => {
+        textOutput += `  - ${key}: ${value}\n`;
+      });
+      textOutput += "Current:\n";
+      Object.entries(exportObj.allocation.currentAllocation || {}).forEach(([key, value]) => {
+         textOutput += `  - ${key}: ${value.percent ? value.percent.toFixed(2) + '%' : 'N/A'}\n`; // Display percentage
+      });
+      textOutput += "Difference:\n";
+      Object.entries(exportObj.allocation.allocationDifferences || {}).forEach(([key, value]) => {
+        textOutput += `  - ${key}: ${value}\n`;
+      });
+      textOutput += "\n";
+    }
+
+    if (exportObj.holdings && exportObj.holdings.length > 0) {
+      textOutput += "** Holdings Summary **\n";
+      exportObj.holdings.forEach((holding: any) => {
+        textOutput += `- ${holding.name} (${holding.ticker})\n`;
+        textOutput += `  Quantity: ${holding.totalQuantity.toFixed(4)}\n`;
+        textOutput += `  Invested: ${formatCurrency(holding.totalInvested, currency)}\n`;
+        textOutput += `  Current Value: ${formatCurrency(holding.totalCurrentValue, currency)}\n`;
+        textOutput += `  Result: ${formatCurrency(holding.totalResult, currency)}\n`;
+        if (holding.dividendYield !== undefined) {
+          textOutput += `  Dividend Yield: ${formatPercentage(holding.dividendYield)}\n`;
+        }
+         // Add performance if available
+         if (holding.performance_1day !== null) textOutput += `  1D Perf: ${formatPercentage(holding.performance_1day)}\n`;
+         if (holding.performance_1week !== null) textOutput += `  1W Perf: ${formatPercentage(holding.performance_1week)}\n`;
+         if (holding.performance_1month !== null) textOutput += `  1M Perf: ${formatPercentage(holding.performance_1month)}\n`;
+         if (holding.performance_1year !== null) textOutput += `  1Y Perf: ${formatPercentage(holding.performance_1year)}\n`;
+        textOutput += "\n";
+      });
+    }
+
+    return textOutput;
+  }
+};
+
 
 export default function ImportExportModal({
   onClose,
   onImport,
   portfolioData,
-  isImporting
+  isImporting,
+  currency = 'USD' // Default currency
 }: ImportExportModalProps) {
   const [activeTab, setActiveTab] = useState<"import" | "export">("import");
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -21,6 +155,11 @@ export default function ImportExportModal({
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // --- Export State ---
+  const [selectedSections, setSelectedSections] = useState<string[]>(['summary', 'allocation', 'holdings']);
+  const [exportFormat, setExportFormat] = useState<'json' | 'text'>('json');
+  const [exportData, setExportData] = useState<string>('');
 
   // Close modal when clicking outside
   useEffect(() => {
@@ -50,6 +189,7 @@ export default function ImportExportModal({
     };
   }, [onClose]);
 
+  // --- Import Logic (remains mostly the same) ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setCsvFile(e.target.files[0]);
@@ -58,10 +198,11 @@ export default function ImportExportModal({
   };
 
   const parseTrading212CSV = (csvText: string) => {
-    try {
+    // ... (parsing logic remains the same) ...
+     try {
       // Split by lines and filter out empty lines
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
-      
+
       if (lines.length < 2) {
         throw new Error("CSV file must contain at least a header row and one data row");
       }
@@ -74,7 +215,7 @@ export default function ImportExportModal({
 
       // Find the total row (usually starts with "Total")
       const totalRowIndex = lines.findIndex(line => line.startsWith('"Total"'));
-      
+
       if (totalRowIndex === -1) {
         throw new Error("Could not find the Total row in the CSV");
       }
@@ -83,11 +224,11 @@ export default function ImportExportModal({
       const totalRow = lines[totalRowIndex];
       const totalRowParts = totalRow.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
       const cleanTotalRow = totalRowParts.map(part => part.replace(/^"|"$/g, ''));
-      
+
       // Extract pie name and allocation percentage
       const pieNameWithAllocation = cleanTotalRow[1]; // e.g., "REIT (30%)"
       const pieNameMatch = pieNameWithAllocation.match(/(.*)\s+\((\d+)%\)/);
-      
+
       if (!pieNameMatch) {
         throw new Error("Could not parse pie name and allocation percentage");
       }
@@ -100,7 +241,7 @@ export default function ImportExportModal({
       const instruments = instrumentRows.map(row => {
         const rowParts = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
         const cleanRowParts = rowParts.map(part => part.replace(/^"|"$/g, ''));
-        
+
         const instrument: Record<string, any> = {};
         cleanHeaders.forEach((header, index) => {
           if (index < cleanRowParts.length) {
@@ -112,7 +253,7 @@ export default function ImportExportModal({
             }
           }
         });
-        
+
         return instrument;
       });
 
@@ -156,42 +297,55 @@ export default function ImportExportModal({
     }
   };
 
-  const handleExportJSON = () => {
-    if (!portfolioData) return;
-
-    const dataStr = JSON.stringify(portfolioData, null, 2);
-    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
-    
-    const exportFileName = `portfolio_export_${new Date().toISOString().split('T')[0]}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileName);
-    linkElement.click();
+  // --- Export Logic ---
+  const handleSectionChange = (section: string) => {
+    setSelectedSections(prev =>
+      prev.includes(section)
+        ? prev.filter(s => s !== section)
+        : [...prev, section]
+    );
   };
 
-  const handleCopyToClipboard = async () => {
-    if (!portfolioData) return;
+  // Update export data whenever selections change
+  useEffect(() => {
+    const data = prepareExportData(portfolioData, selectedSections, exportFormat, currency);
+    setExportData(data);
+  }, [portfolioData, selectedSections, exportFormat, currency]);
 
+  const handleCopyToClipboard = useCallback(async () => {
     try {
-      const dataStr = JSON.stringify(portfolioData, null, 2);
-      await navigator.clipboard.writeText(dataStr);
+      await navigator.clipboard.writeText(exportData);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
+      setParseError("Failed to copy data to clipboard."); // Use parseError state for feedback
     }
-  };
+  }, [exportData]);
+
+  const handleDownloadFile = useCallback(() => {
+    const fileExtension = exportFormat === 'json' ? 'json' : 'txt';
+    const mimeType = exportFormat === 'json' ? 'application/json' : 'text/plain';
+    const blob = new Blob([exportData], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `portfolio_export_${new Date().toISOString().split('T')[0]}.${fileExtension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [exportData, exportFormat]);
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out">
-      <div 
+      <div
         ref={modalRef}
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform"
       >
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {activeTab === "import" ? "Import Portfolio" : "Export Portfolio"}
+            Import / Export Portfolio
           </h2>
           <button
             onClick={onClose}
@@ -201,9 +355,10 @@ export default function ImportExportModal({
           </button>
         </div>
 
+        {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
-            className={`py-3 px-4 ${
+            className={`py-3 px-4 flex-1 text-center ${
               activeTab === "import"
                 ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -211,10 +366,10 @@ export default function ImportExportModal({
             onClick={() => setActiveTab("import")}
           >
             <FiUpload className="inline-block mr-2" />
-            Import
+            Import (Trading 212 CSV)
           </button>
           <button
-            className={`py-3 px-4 ${
+            className={`py-3 px-4 flex-1 text-center ${
               activeTab === "export"
                 ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-medium"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -222,12 +377,13 @@ export default function ImportExportModal({
             onClick={() => setActiveTab("export")}
           >
             <FiDownload className="inline-block mr-2" />
-            Export
+            Export Data
           </button>
         </div>
 
-        <div className="p-4">
+        <div className="p-6"> {/* Increased padding */}
           {activeTab === "import" ? (
+            // --- Import Tab Content ---
             <div className="space-y-4">
               <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
                 <input
@@ -282,37 +438,106 @@ export default function ImportExportModal({
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Export your portfolio data as a JSON file or copy it to your clipboard.
-                </p>
-                
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                  <Button onClick={handleExportJSON}>
-                    <FiDownload className="mr-2" />
-                    Download JSON
-                  </Button>
-                  <Button variant="outline" onClick={handleCopyToClipboard}>
-                    {copied ? (
-                      <>
-                        <FiCheck className="mr-2 text-green-500" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <FiCopy className="mr-2" />
-                        Copy to Clipboard
-                      </>
-                    )}
-                  </Button>
+            // --- Export Tab Content ---
+            <div className="space-y-6">
+              {/* Section Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Sections to Export:
+                </label>
+                <div className="space-y-2">
+                  {['summary', 'allocation', 'holdings'].map((section) => (
+                    <label key={section} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedSections.includes(section)}
+                        onChange={() => handleSectionChange(section)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300 capitalize">{section}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button variant="outline" onClick={onClose}>
-                  Close
+              {/* Format Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Export Format:
+                </label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="json"
+                      checked={exportFormat === 'json'}
+                      onChange={() => setExportFormat('json')}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">JSON (for LLMs)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="text"
+                      checked={exportFormat === 'text'}
+                      onChange={() => setExportFormat('text')}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Plain Text</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Preview Area (Optional but helpful) */}
+              <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                   Preview:
+                 </label>
+                 <textarea
+                   readOnly
+                   value={exportData}
+                   rows={6}
+                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-xs font-mono"
+                   placeholder="Select sections and format to see preview..."
+                 />
+              </div>
+
+              {/* Error Message Area */}
+              {parseError && (
+                <div className="text-red-600 dark:text-red-400 text-sm">
+                  {parseError}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={handleCopyToClipboard}
+                  disabled={!exportData}
+                >
+                  {copied ? (
+                    <>
+                      <FiCheck className="mr-2 text-green-500" /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <FiClipboard className="mr-2" /> Copy to Clipboard
+                    </>
+                  )}
                 </Button>
+                <Button
+                  onClick={handleDownloadFile}
+                  disabled={!exportData}
+                >
+                  <FiFileText className="mr-2" /> Download File
+                </Button>
+                 <Button variant="outline" onClick={onClose}>
+                   Close
+                 </Button>
               </div>
             </div>
           )}
