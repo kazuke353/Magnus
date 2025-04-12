@@ -60,8 +60,8 @@ export async function fetchPieDetails(
       const ticker = instrument.ticker || '';
 
       const instrumentData: PieInstrument = {
-        currentShare: instrument.currentShare || 0,
-        expectedShare: instrument.expectedShare || 0,
+        pieCurrentAllocation: instrument.currentShare * 100 || 0, // Renamed and assigned
+        pieTargetAllocation: instrument.expectedShare * 100 || 0, // Renamed and assigned
         issues: instrument.issues || false,
         ownedQuantity: instrument.ownedQuantity || 0,
         ticker: ticker,
@@ -77,25 +77,25 @@ export async function fetchPieDetails(
         instrumentData.fullName = fullInstrumentData.name;
         instrumentData.addedToMarket = fullInstrumentData.addedOn;
         instrumentData.currencyCode = fullInstrumentData.currencyCode;
-        instrumentData.maxOpenQuantity = fullInstrumentData.maxOpenQuantity;
-        instrumentData.minTradeQuantity = String(fullInstrumentData.minTradeQuantity);
+        // Removed maxOpenQuantity and minTradeQuantity assignments
         instrumentData.type = fullInstrumentData.type;
       }
 
       // Fetch performance data concurrently
       if (ticker) {
-         try {
-            const performanceData = await fetchInstrumentPerformance(ticker);
-            Object.assign(instrumentData, performanceData);
-         } catch (perfError) {
-             console.error(`Failed to fetch performance for ${ticker}:`, perfError);
-             // Assign default/null values if performance fetch fails
-             instrumentData.dividendYield = 0;
-             instrumentData.performance_1week = null;
-             instrumentData.performance_1month = null;
-             instrumentData.performance_3months = null;
-             instrumentData.performance_1year = null;
-         }
+        try {
+          const performanceData = await fetchInstrumentPerformance(ticker);
+          Object.assign(instrumentData, performanceData);
+        } catch (perfError) {
+          console.error(`Failed to fetch performance for ${ticker}:`, perfError);
+          // Assign default/null values if performance fetch fails
+          instrumentData.dividendYield = 0;
+          instrumentData.performance_1day = null; // Added default
+          instrumentData.performance_1week = null;
+          instrumentData.performance_1month = null;
+          instrumentData.performance_3months = null;
+          instrumentData.performance_1year = null;
+        }
       }
 
 
@@ -160,28 +160,28 @@ export async function getAllPiesData(
 
     // Use Promise.all to fetch pie details concurrently (with delays managed internally if needed)
     const pieDetailPromises = piesList.map(async (pie, index) => {
-        const pieId = pie.id;
-        if (!pieId) {
-            console.warn(`Pie without ID encountered for user ${userId}, skipping`);
-            return null;
-        }
+      const pieId = pie.id;
+      if (!pieId) {
+        console.warn(`Pie without ID encountered for user ${userId}, skipping`);
+        return null;
+      }
 
-        // Optional: Add delay here if needed *between starting* fetches,
-        // though Promise.all runs them concurrently once started.
-        // If strict sequential fetching with delay is required, use a for...of loop as before.
-        // await new Promise(resolve => setTimeout(resolve, index * delayBetweenPies * 1000)); // Stagger start
+      // Optional: Add delay here if needed *between starting* fetches,
+      // though Promise.all runs them concurrently once started.
+      // If strict sequential fetching with delay is required, use a for...of loop as before.
+      // await new Promise(resolve => setTimeout(resolve, index * delayBetweenPies * 1000)); // Stagger start
 
-        return fetchPieDetails(userId, pieId, allInstrumentsMetadata); // Pass userId
+      return fetchPieDetails(userId, pieId, allInstrumentsMetadata); // Pass userId
     });
 
     const resolvedPies = await Promise.all(pieDetailPromises);
 
     resolvedPies.forEach(pieData => {
-        if (pieData) {
-            allPies.push(pieData);
-            totalInvestedOverall += pieData.totalInvested || 0;
-            totalResultOverall += pieData.totalResult || 0;
-        }
+      if (pieData) {
+        allPies.push(pieData);
+        totalInvestedOverall += pieData.totalInvested || 0;
+        totalResultOverall += pieData.totalResult || 0;
+      }
     });
 
 

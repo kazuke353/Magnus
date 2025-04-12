@@ -17,7 +17,7 @@ interface SortableTableProps<T> {
   className?: string;
   emptyMessage?: string;
   // Add a prop to get a unique key for each data item
-  keyField: keyof T;
+  keyField: keyof T; // Ensure this prop is provided
 }
 
 export default function SortableTable<T>({
@@ -181,9 +181,8 @@ export default function SortableTable<T>({
                 <th
                   key={column.key as string} // <-- KEY PROP ADDED HERE
                   scope="col"
-                  className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider ${
-                    column.sortable !== false ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''
-                  }`}
+                  className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider ${column.sortable !== false ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''
+                    }`}
                   onClick={() => column.sortable !== false && handleSort(column.key)}
                 >
                   <div className="flex items-center">
@@ -236,22 +235,20 @@ export default function SortableTable<T>({
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                currentPage === 1
+              className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${currentPage === 1
                   ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                   : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
+                }`}
             >
               Previous
             </button>
             <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                currentPage === totalPages
+              className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${currentPage === totalPages
                   ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                   : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
+                }`}
             >
               Next
             </button>
@@ -271,11 +268,10 @@ export default function SortableTable<T>({
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                    currentPage === 1
+                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${currentPage === 1
                       ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <span className="sr-only">First</span>
                   <span>First</span>
@@ -283,11 +279,10 @@ export default function SortableTable<T>({
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                    currentPage === 1
+                  className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${currentPage === 1
                       ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <span className="sr-only">Previous</span>
                   <FiChevronLeft className="h-5 w-5" />
@@ -311,11 +306,10 @@ export default function SortableTable<T>({
                     <button
                       key={pageNumber} // <-- KEY PROP ADDED HERE
                       onClick={() => setCurrentPage(pageNumber)}
-                      className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                        currentPage === pageNumber
+                      className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${currentPage === pageNumber
                           ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 dark:border-blue-500 text-blue-600 dark:text-blue-300'
                           : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
+                        }`}
                     >
                       {pageNumber}
                     </button>
@@ -325,11 +319,10 @@ export default function SortableTable<T>({
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                    currentPage === totalPages
+                  className={`relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium ${currentPage === totalPages
                       ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <span className="sr-only">Next</span>
                   <FiChevronRight className="h-5 w-5" />
@@ -337,11 +330,10 @@ export default function SortableTable<T>({
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
-                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                    currentPage === totalPages
+                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${currentPage === totalPages
                       ? 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   <span className="sr-only">Last</span>
                   <span>Last</span>

@@ -12,10 +12,13 @@ interface Instrument {
   currentValue: number;
   resultValue: number;
   dividendYield?: number;
+  performance_1day?: number;
   performance_1week?: number;
   performance_1month?: number;
   performance_3months?: number;
   performance_1year?: number;
+  pieCurrentAllocation: number; // Added renamed field
+  pieTargetAllocation: number; // Added renamed field
 }
 
 interface Portfolio {
@@ -89,6 +92,7 @@ export default function PortfolioBreakdown({
               data={portfolio.instruments}
               itemsPerPage={10}
               emptyMessage="No instruments found in this portfolio."
+              keyField="ticker" // Assuming 'ticker' is unique within a portfolio
               columns={[
                 {
                   key: "fullName",
@@ -152,6 +156,26 @@ export default function PortfolioBreakdown({
                   render: (item) => (
                     <span className={`font-semibold ${item.resultValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {formatCurrency(item.resultValue, currency, true)}
+                    </span>
+                  )
+                },
+                { // Added Actual Share column
+                  key: "pieCurrentAllocation",
+                  header: "Actual Share %",
+                  sortable: true,
+                  render: (item) => (
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formatPercentage(item.pieCurrentAllocation)}
+                    </span>
+                  )
+                },
+                { // Added Target Share column
+                  key: "pieTargetAllocation",
+                  header: "Target Share %",
+                  sortable: true,
+                  render: (item) => (
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formatPercentage(item.pieTargetAllocation)}
                     </span>
                   )
                 },

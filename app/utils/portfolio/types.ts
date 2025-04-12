@@ -4,8 +4,7 @@ export interface InstrumentMetadata {
   currencyCode: string;
   type: string;
   addedOn: string;
-  maxOpenQuantity: number;
-  minTradeQuantity: number;
+  // Removed maxOpenQuantity and minTradeQuantity
   exchange?: string;
   sector?: string;
   industry?: string;
@@ -23,18 +22,17 @@ export interface PieInstrument {
   fullName?: string;
   addedToMarket?: string;
   currencyCode?: string;
-  maxOpenQuantity?: number;
-  minTradeQuantity?: string;
+  // Removed maxOpenQuantity and minTradeQuantity
   type?: string;
-  currentShare: number;
-  expectedShare: number;
+  pieCurrentAllocation: number; // Renamed from currentShare
+  pieTargetAllocation: number; // Renamed from expectedShare
   issues: boolean;
   ownedQuantity: number;
   investedValue: number;
   currentValue: number;
   resultValue: number;
   dividendYield: number;
-  performance_1day?: number | null; // Added 1-day performance
+  performance_1day?: number | null;
   performance_1week?: number | null;
   performance_1month?: number | null;
   performance_3months?: number | null;

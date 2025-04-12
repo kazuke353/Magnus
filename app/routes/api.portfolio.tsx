@@ -56,39 +56,53 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     // Data Exposure Review: Select only necessary fields before returning
+    // --- UPDATED FILTERING ---
     const filteredPortfolioData = {
-        overallSummary: portfolioData.overallSummary ? {
-            overallSummary: {
-                totalInvestedOverall: portfolioData.overallSummary.overallSummary.totalInvestedOverall,
-                totalResultOverall: portfolioData.overallSummary.overallSummary.totalResultOverall,
-                returnPercentageOverall: portfolioData.overallSummary.overallSummary.returnPercentageOverall,
-                fetchDate: portfolioData.overallSummary.overallSummary.fetchDate,
-            }
-        } : null,
-        allocationAnalysis: portfolioData.allocationAnalysis ? {
-            targetAllocation: portfolioData.allocationAnalysis.targetAllocation,
-            currentAllocation: portfolioData.allocationAnalysis.currentAllocation,
-            allocationDifferences: portfolioData.allocationAnalysis.allocationDifferences,
-            estimatedAnnualDividend: portfolioData.allocationAnalysis.estimatedAnnualDividend,
-        } : undefined,
-        portfolio: portfolioData.portfolio ? portfolioData.portfolio.map(pie => ({
-            name: pie.name,
-            returnPercentage: pie.returnPercentage,
-            totalInvested: pie.totalInvested,
-            totalResult: pie.totalResult,
-            instruments: pie.instruments.map(inst => ({
-                ticker: inst.ticker,
-                fullName: inst.fullName,
-                currentValue: inst.currentValue,
-                ownedQuantity: inst.ownedQuantity,
-                resultValue: inst.resultValue,
-                // Add other fields ONLY if needed by the client for this specific API
-            }))
-        })) : null,
-        freeCashAvailable: portfolioData.freeCashAvailable,
-        fetchDate: portfolioData.fetchDate,
-        // Explicitly exclude rebalanceInvestmentForTarget unless needed
+      overallSummary: portfolioData.overallSummary ? {
+        overallSummary: {
+          totalInvestedOverall: portfolioData.overallSummary.overallSummary.totalInvestedOverall,
+          totalResultOverall: portfolioData.overallSummary.overallSummary.totalResultOverall,
+          returnPercentageOverall: portfolioData.overallSummary.overallSummary.returnPercentageOverall,
+          fetchDate: portfolioData.overallSummary.overallSummary.fetchDate,
+        }
+      } : null,
+      allocationAnalysis: portfolioData.allocationAnalysis ? {
+        targetAllocation: portfolioData.allocationAnalysis.targetAllocation,
+        currentAllocation: portfolioData.allocationAnalysis.currentAllocation,
+        allocationDifferences: portfolioData.allocationAnalysis.allocationDifferences,
+        estimatedAnnualDividend: portfolioData.allocationAnalysis.estimatedAnnualDividend,
+      } : undefined,
+      portfolio: portfolioData.portfolio ? portfolioData.portfolio.map(pie => ({
+        name: pie.name,
+        creationDate: pie.creationDate, // Include creationDate
+        dividendCashAction: pie.dividendCashAction, // Include dividendCashAction
+        returnPercentage: pie.returnPercentage,
+        totalInvested: pie.totalInvested,
+        totalResult: pie.totalResult,
+        instruments: pie.instruments.map(inst => ({
+          ticker: inst.ticker,
+          fullName: inst.fullName,
+          type: inst.type, // Include type
+          ownedQuantity: inst.ownedQuantity,
+          investedValue: inst.investedValue,
+          currentValue: inst.currentValue,
+          resultValue: inst.resultValue,
+          dividendYield: inst.dividendYield, // Include dividendYield
+          performance_1day: inst.performance_1day, // Include performance_1day
+          performance_1week: inst.performance_1week, // Include performance_1week
+          performance_1month: inst.performance_1month, // Include performance_1month
+          performance_3months: inst.performance_3months, // Include performance_3months
+          performance_1year: inst.performance_1year, // Include performance_1year
+          pieCurrentAllocation: inst.pieCurrentAllocation, // Include renamed pieCurrentAllocation
+          pieTargetAllocation: inst.pieTargetAllocation, // Include renamed pieTargetAllocation
+          // Add other fields ONLY if needed by the client for this specific API
+        }))
+      })) : null,
+      freeCashAvailable: portfolioData.freeCashAvailable,
+      fetchDate: portfolioData.fetchDate,
+      // Explicitly exclude rebalanceInvestmentForTarget unless needed
     };
+    // --- END UPDATED FILTERING ---
 
 
     return json({

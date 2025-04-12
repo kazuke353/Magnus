@@ -14,7 +14,7 @@ interface TaskItemProps {
   onToggleComplete: (taskId: string, completed: boolean) => void; // Keep for direct submit
   onSelect?: () => void;
   isSelected?: boolean;
-  currency?: string;
+  currency?: string; // Expect currency code (e.g., 'USD')
 }
 
 export default function TaskItem({
@@ -24,7 +24,7 @@ export default function TaskItem({
   onToggleComplete,
   onSelect,
   isSelected,
-  currency = "$"
+  currency = "USD" // Default to a valid currency CODE
 }: TaskItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -72,8 +72,8 @@ export default function TaskItem({
             <button
               onClick={handleToggleCompleteClick}
               className={`mt-1 h-5 w-5 rounded-full flex items-center justify-center border ${task.completed
-                  ? 'bg-blue-500 border-blue-500 text-white'
-                  : 'border-gray-300 dark:border-gray-600'
+                ? 'bg-blue-500 border-blue-500 text-white'
+                : 'border-gray-300 dark:border-gray-600'
                 } hover:border-blue-400 dark:hover:border-blue-500 transition-colors`}
               aria-label={`Mark task "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
             >
@@ -121,6 +121,7 @@ export default function TaskItem({
                 {task.amount && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                     <FiDollarSign className="mr-1" />
+                    {/* Pass the currency code */}
                     {formatCurrency(task.amount, currency)}
                   </span>
                 )}

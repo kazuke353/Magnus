@@ -72,15 +72,14 @@ const stripCodeBlocks = (text: string | null): string => {
     .trim();
 };
 
-// --- Loader remains the same ---
+// --- Loader ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await requireAuthentication(request);
     const userId = user.id;
     const userDetails = await getUserById(userId);
-    const currency = userDetails?.settings?.currency === "USD" ? "$" :
-      userDetails?.settings?.currency === "EUR" ? "€" :
-        userDetails?.settings?.currency === "GBP" ? "£" : "$";
+    // Pass the currency CODE directly, default to 'USD' if not set
+    const currency = userDetails?.settings?.currency || 'USD';
     const userTasks = await getUserTasks(userId);
     const recurringTasks = await getRecurringTasksForUser(userId);
     const recurringTasksWithOccurrences = await Promise.all(
@@ -108,7 +107,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       tasks: uniqueTasks, // Send all tasks (regular + occurrences)
       recurringTasks: recurringTasksWithOccurrences, // Send parent recurring tasks separately
       categories,
-      currency
+      currency // Pass the currency code
     });
   } catch (error) {
     return errorResponse(error);
@@ -280,7 +279,7 @@ export default function TasksPage() {
   const navigation = useNavigation();
 
   const { tasks: allTasks, recurringTasks, categories, currency, error: loaderError } = loaderData.error
-    ? { tasks: [], recurringTasks: [], categories: [], currency: '$', error: loaderData.error }
+    ? { tasks: [], recurringTasks: [], categories: [], currency: 'USD', error: loaderData.error } // Default currency code
     : { ...loaderData, error: null };
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -491,7 +490,7 @@ export default function TasksPage() {
                 }
               }}
               selectedDate={selectedDate} // Pass selected date to highlight
-              currency={currency}
+              currency={currency} // Pass currency code
             />
           </Card>
         </div>
@@ -588,7 +587,7 @@ export default function TasksPage() {
                       onDelete={handleDeleteTask} // Pass correct handler
                       onSelect={() => setSelectedTask(task)}
                       isSelected={selectedTask?.id === task.id}
-                      currency={currency}
+                      currency={currency} // Pass currency code
                     />
                   ))}
                   {completedTasks.length > 0 && (
@@ -604,7 +603,7 @@ export default function TasksPage() {
                             onDelete={handleDeleteTask} // Pass correct handler
                             onSelect={() => setSelectedTask(task)}
                             isSelected={selectedTask?.id === task.id}
-                            currency={currency}
+                            currency={currency} // Pass currency code
                           />
                         ))}
                       </div>
@@ -635,7 +634,7 @@ export default function TasksPage() {
                 onEdit={() => setShowTaskForm(true)} // Pass correct handler
                 onDelete={() => handleDeleteTask(selectedTask.id)} // Pass correct handler
                 onToggleComplete={() => handleToggleComplete(selectedTask.id, selectedTask.completed)} // Pass correct handler
-                currency={currency}
+                currency={currency} // Pass currency code
               />
             </Card>
           )}
