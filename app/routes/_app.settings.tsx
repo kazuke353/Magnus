@@ -1,12 +1,12 @@
 import { useLoaderData, useActionData, Form, useNavigation, useSubmit } from "@remix-run/react";
 import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { requireAuthentication } from "~/services/auth.server";
-import { updateUserSettings, getUserById } from "~/db/user.server"; // Added getUserById
-import { listUserApiKeyServices, saveUserApiKey, deleteUserApiKey } from "~/db/apiKeys.server"; // Import API key functions
+import { updateUserSettings, getUserById } from "~/db/user.server";
+import { listUserApiKeyServices, saveUserApiKey, deleteUserApiKey } from "~/db/apiKeys.server";
 import Card from "~/components/Card";
 import Input from "~/components/Input";
-import Select from "~/components/Select"; // Import Select component
-import type { SelectOption } from "~/components/Select"; // Import SelectOption type
+import Select from "~/components/Select";
+import type { SelectOption } from "~/components/Select";
 import Button from "~/components/Button";
 import { useState, useEffect } from "react";
 import { z } from "zod";
@@ -14,17 +14,22 @@ import { useTheme } from "~/hooks/useTheme";
 import { setTheme as setThemeCookie, Theme } from "~/utils/theme";
 import { getSession, commitSession } from "~/services/session.server";
 import { formatDate } from "~/utils/formatters";
-import { FiTrash2, FiPlus, FiKey, FiEyeOff, FiEye } from "react-icons/fi"; // Added icons
-import { showToast } from "~/components/ToastContainer"; // Import toast
+import { FiTrash2, FiPlus, FiKey, FiEyeOff, FiEye } from "react-icons/fi";
+import { showToast } from "~/components/ToastContainer";
+import { countries } from "~/utils/countries"; // Import country list
+import { currencies } from "~/utils/currencies"; // Import currency list
 
 // Define the list of supported services
 const SUPPORTED_API_SERVICES: SelectOption[] = [
-  { value: "", label: "Select a service..." }, // Add a placeholder
+  { value: "", label: "Select a service..." },
   { value: "openai", label: "OpenAI" },
   { value: "trading212", label: "Trading 212" },
   // Add more services here as needed
 ];
 
+// Update SettingsSchema to use enum for country and currency if desired,
+// or keep as string().min(1) as Select enforces selection.
+// Using string().min(1) is simpler for now.
 const SettingsSchema = z.object({
   country: z.string().min(1, "Country is required"),
   currency: z.string().min(1, "Currency is required"),
@@ -37,43 +42,42 @@ const ApiKeySchema = z.object({
   serviceName: z.enum(SUPPORTED_API_SERVICES.filter(s => s.value).map(s => s.value) as [string, ...string[]], {
       errorMap: () => ({ message: "Please select a valid service." })
   }),
-  apiKey: z.string().min(10, "API Key seems too short"), // Basic length check
+  apiKey: z.string().min(10, "API Key seems too short"),
 });
 
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await requireAuthentication(request);
-  console.log(`[Settings Loader] Authenticated User ID: ${user.id}`); // DEBUG LOG
+  console.log(`[Settings Loader] Authenticated User ID: ${user.id}`);
   const apiKeyServices = await listUserApiKeyServices(user.id);
   const fullUser = await getUserById(user.id);
 
-  return json({ user: fullUser || user, apiKeyServices });
+  // Pass country and currency lists to the component
+  return json({ user: fullUser || user, apiKeyServices, countries, currencies });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireAuthentication(request);
-  console.log(`[Settings Action] Authenticated User ID: ${user.id}`); // DEBUG LOG
+  console.log(`[Settings Action] Authenticated User ID: ${user.id}`);
   const formData = await request.formData();
   const actionType = formData.get("_action") as string;
-  console.log(`[Settings Action] Action Type: ${actionType}, User ID: ${user.id}`); // DEBUG LOG
+  console.log(`[Settings Action] Action Type: ${actionType}, User ID: ${user.id}`);
 
   // --- Handle API Key Actions ---
   if (actionType === "save_api_key") {
     const serviceName = formData.get("serviceName") as string;
     const apiKey = formData.get("apiKey") as string;
-    console.log(`[Settings Action - save_api_key] Saving for User ID: ${user.id}, Service: ${serviceName}`); // DEBUG LOG
+    console.log(`[Settings Action - save_api_key] Saving for User ID: ${user.id}, Service: ${serviceName}`);
 
     try {
-      // Validate using the updated schema
       ApiKeySchema.parse({ serviceName, apiKey });
-      await saveUserApiKey(user.id, serviceName, apiKey); // Pass the authenticated user's ID
+      await saveUserApiKey(user.id, serviceName, apiKey);
       showToast({ type: "success", message: `API Key for ${serviceName} saved successfully.` });
       return json({ success: true, serviceName });
     } catch (error) {
       console.error("Save API Key Error:", error);
        if (error instanceof z.ZodError) {
          const fieldErrors = error.flatten().fieldErrors;
-         // Use formErrors for general schema errors like enum validation
          const formErrors = error.flatten().formErrors;
          return json({ apiKeyError: true, fieldErrors, formErrors }, { status: 400 });
        }
@@ -83,12 +87,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (actionType === "delete_api_key") {
     const serviceName = formData.get("serviceName") as string;
-    console.log(`[Settings Action - delete_api_key] Deleting for User ID: ${user.id}, Service: ${serviceName}`); // DEBUG LOG
+    console.log(`[Settings Action - delete_api_key] Deleting for User ID: ${user.id}, Service: ${serviceName}`);
     if (!serviceName) {
       return json({ apiKeyError: true, error: "Service name is required to delete." }, { status: 400 });
     }
     try {
-      const success = await deleteUserApiKey(user.id, serviceName); // Pass the authenticated user's ID
+      const success = await deleteUserApiKey(user.id, serviceName);
       if (!success) {
         throw new Error("Failed to delete API key from database.");
       }
@@ -102,7 +106,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // --- Handle User Settings Action ---
   if (actionType === "update_settings") {
-     console.log(`[Settings Action - update_settings] Updating for User ID: ${user.id}`); // DEBUG LOG
+     console.log(`[Settings Action - update_settings] Updating for User ID: ${user.id}`);
     const country = formData.get("country") as string || '';
     const currency = formData.get("currency") as string || 'USD';
     const monthlyBudgetStr = formData.get("monthlyBudget") as string || '0';
@@ -111,9 +115,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       const monthlyBudget = parseFloat(monthlyBudgetStr);
+      // Validate using the schema (ensures country/currency are not empty)
       const validatedData = SettingsSchema.parse({ country, currency, monthlyBudget, theme });
 
-      await updateUserSettings(user.id, validatedData); // Pass the authenticated user's ID
+      await updateUserSettings(user.id, validatedData);
 
       const cookieHeader = request.headers.get("Cookie");
       const session = await getSession(cookieHeader);
@@ -145,7 +150,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { user, apiKeyServices: initialApiKeyServices } = useLoaderData<typeof loader>();
+  // Destructure countries and currencies from loader data
+  const { user, apiKeyServices: initialApiKeyServices, countries, currencies } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submit = useSubmit();
@@ -156,14 +162,15 @@ export default function Settings() {
   const defaultMonthlyBudget = user?.settings?.monthlyBudget?.toString() || '0';
   const defaultTheme = user?.settings?.theme || 'light';
 
-  const [country, setCountry] = useState(defaultCountry);
-  const [currency, setCurrency] = useState(defaultCurrency);
+  // Use state for selected values
+  const [selectedCountry, setSelectedCountry] = useState(defaultCountry);
+  const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
   const [monthlyBudget, setMonthlyBudget] = useState(defaultMonthlyBudget);
   const [selectedTheme, setSelectedTheme] = useState<Theme>(defaultTheme as Theme);
 
   // State for API Key form
   const [apiKeyServices, setApiKeyServices] = useState<string[]>(initialApiKeyServices || []);
-  const [newServiceName, setNewServiceName] = useState(""); // Default to empty string for placeholder
+  const [newServiceName, setNewServiceName] = useState("");
   const [newApiKey, setNewApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -176,7 +183,7 @@ export default function Settings() {
   useEffect(() => {
     if (actionData?.success && actionData.serviceName && !apiKeyServices.includes(actionData.serviceName)) {
       setApiKeyServices(prev => [...prev, actionData.serviceName].sort());
-      setNewServiceName(""); // Reset dropdown on success
+      setNewServiceName("");
       setNewApiKey("");
       setShowApiKey(false);
     }
@@ -195,6 +202,9 @@ export default function Settings() {
   const handleSettingsSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    // Ensure the selected values from state are included if the form elements aren't directly named
+    formData.set("country", selectedCountry);
+    formData.set("currency", selectedCurrency);
     formData.append("_action", "update_settings");
     submit(formData, { method: "post" });
   };
@@ -222,7 +232,7 @@ export default function Settings() {
 
   const settingsFieldErrors = actionData?.settingsError ? actionData.fieldErrors : null;
   const apiKeyFieldErrors = actionData?.apiKeyError ? actionData.fieldErrors : null;
-  const apiKeyFormErrors = actionData?.apiKeyError ? actionData.formErrors : null; // Get general form errors
+  const apiKeyFormErrors = actionData?.apiKeyError ? actionData.formErrors : null;
   const settingsGeneralError = actionData?.settingsError ? actionData.error : null;
   const apiKeyGeneralError = actionData?.apiKeyError ? actionData.error : null;
 
@@ -238,21 +248,27 @@ export default function Settings() {
         <Form method="post" className="space-y-6" onSubmit={handleSettingsSubmit}>
           <input type="hidden" name="_action" value="update_settings" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input
+            {/* Country Select */}
+            <Select
               id="country"
               name="country"
               label="Country"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
+              options={countries} // Use imported country list
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
               error={settingsFieldErrors?.country?.[0]}
+              required
             />
-            <Input
+            {/* Currency Select */}
+            <Select
               id="currency"
               name="currency"
               label="Currency"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              options={currencies} // Use imported currency list
+              value={selectedCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
               error={settingsFieldErrors?.currency?.[0]}
+              required
             />
             <Input
               id="monthlyBudget"
@@ -310,7 +326,6 @@ export default function Settings() {
          <Form method="post" className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-6 mb-6" onSubmit={handleApiKeySubmit}>
             <input type="hidden" name="_action" value="save_api_key" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Add / Update API Key</h3>
-            {/* Replace Input with Select */}
             <Select
               id="serviceName"
               name="serviceName"
@@ -319,7 +334,7 @@ export default function Settings() {
               onChange={(e) => setNewServiceName(e.target.value)}
               options={SUPPORTED_API_SERVICES}
               required
-              error={apiKeyFieldErrors?.serviceName?.[0] || apiKeyFormErrors?.[0]} // Show field or form error
+              error={apiKeyFieldErrors?.serviceName?.[0] || apiKeyFormErrors?.[0]}
             />
             <div className="relative">
               <Input
@@ -332,7 +347,7 @@ export default function Settings() {
                 placeholder="Enter the API key"
                 required
                 error={apiKeyFieldErrors?.apiKey?.[0]}
-                className="pr-10" // Add padding for the button
+                className="pr-10"
               />
               <button
                 type="button"
