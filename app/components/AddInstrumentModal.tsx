@@ -33,10 +33,10 @@ export default function AddInstrumentModal({
   const [mode, setMode] = useState<'watchlist' | 'pie'>(defaultMode);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const searchFetcher = useFetcher();
   const instrumentFetcher = useFetcher();
-  
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -50,84 +50,93 @@ export default function AddInstrumentModal({
       setMode(defaultMode);
     }
   }, [isOpen, defaultMode]);
-  
+
   // Handle search input changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
-    
+
     if (query.length >= 2) {
       searchFetcher.load(`/api/portfolio/instruments/search?query=${encodeURIComponent(query)}`);
     } else {
       setSearchResults([]);
     }
   };
-  
+
   // Update search results when fetcher completes
   useEffect(() => {
     if (searchFetcher.data && searchFetcher.state === 'idle') {
       setSearchResults(searchFetcher.data.results || []);
     }
   }, [searchFetcher.data, searchFetcher.state]);
-  
+
   // Handle selecting an instrument from search results
   const handleSelectInstrument = (result: InstrumentSearchResult) => {
     setIsLoading(true);
+    // Fetch full instrument details when selected from search
     instrumentFetcher.load(`/api/portfolio/instruments/${result.symbol}`);
   };
-  
+
   // Update selected instrument when fetcher completes
   useEffect(() => {
     if (instrumentFetcher.data && instrumentFetcher.state === 'idle') {
       if (instrumentFetcher.data.instrument) {
         setSelectedInstrument(instrumentFetcher.data.instrument);
+        setError(null); // Clear error on success
       } else if (instrumentFetcher.data.error) {
         setError(instrumentFetcher.data.error);
+        setSelectedInstrument(null); // Clear selection on error
+      } else {
+         // Handle case where API returns success but no instrument
+         setError("Instrument details not found.");
+         setSelectedInstrument(null);
       }
       setIsLoading(false);
+    } else if (instrumentFetcher.state === 'loading') {
+       setIsLoading(true);
     }
   }, [instrumentFetcher.data, instrumentFetcher.state]);
-  
+
   // Handle adding instrument to watchlist
   const handleAddToWatchlist = () => {
     if (!selectedInstrument) {
       setError('Please select an instrument first');
       return;
     }
-    
+
     const parsedTargetPrice = targetPrice ? parseFloat(targetPrice) : undefined;
-    
+
     if (targetPrice && isNaN(parsedTargetPrice!)) {
       setError('Please enter a valid target price');
       return;
     }
-    
+
     if (onAddToWatchlist) {
       onAddToWatchlist(selectedInstrument, notes || undefined, parsedTargetPrice);
       onClose();
     }
   };
-  
+
   // Handle adding instrument to pie
   const handleAddToPie = () => {
     if (!selectedInstrument) {
       setError('Please select an instrument first');
       return;
     }
-    
+
     const parsedAllocation = allocation ? parseFloat(allocation) : undefined;
-    
+
     if (allocation && (isNaN(parsedAllocation!) || parsedAllocation! <= 0 || parsedAllocation! > 100)) {
       setError('Please enter a valid allocation percentage (1-100)');
       return;
     }
-    
+
     if (onAddToPie) {
       onAddToPie(selectedInstrument, parsedAllocation);
       onClose();
     }
   };
-  
+
   return (
     <Suspense fallback={<LoadingIndicator message="Loading Modal..." />}>
       {/* Conditionally render Modal only when isOpen is true */}
@@ -155,7 +164,7 @@ export default function AddInstrumentModal({
                 </button>
               </div>
             )}
-            
+
             {/* Search input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -175,14 +184,15 @@ export default function AddInstrumentModal({
                 </div>
               </div>
             </div>
-            
+
             {/* Search results */}
             {searchResults.length > 0 && !selectedInstrument && (
               <div className="border rounded-md overflow-hidden">
                 <div className="max-h-60 overflow-y-auto">
                   {searchResults.map((result) => (
+                    // *** ADDED KEY PROP HERE ***
                     <button
-                      key={result.symbol}
+                      key={result.symbol} // Use symbol as the unique key
                       className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 border-b last:border-b-0"
                       onClick={() => handleSelectInstrument(result)}
                     >
@@ -194,9 +204,12 @@ export default function AddInstrumentModal({
                 </div>
               </div>
             )}
-            
+
+            {/* Loading Indicator for instrument details */}
+            {isLoading && <LoadingIndicator message="Fetching instrument details..." />}
+
             {/* Selected instrument */}
-            {selectedInstrument && (
+            {selectedInstrument && !isLoading && (
               <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
                 <div className="flex justify-between items-start">
                   <div>
@@ -208,12 +221,16 @@ export default function AddInstrumentModal({
                   </div>
                   <button
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                    onClick={() => setSelectedInstrument(null)}
+                    onClick={() => {
+                        setSelectedInstrument(null);
+                        setSearchQuery(''); // Optionally clear search on deselect
+                        setSearchResults([]);
+                    }}
                   >
                     <FiX />
                   </button>
                 </div>
-                
+
                 {selectedInstrument.currentPrice && (
                   <div className="mt-2 text-sm">
                     <span className="font-medium">Current Price:</span> {selectedInstrument.currentPrice} {selectedInstrument.currencyCode}
@@ -221,9 +238,9 @@ export default function AddInstrumentModal({
                 )}
               </div>
             )}
-            
+
             {/* Watchlist specific fields */}
-            {mode === 'watchlist' && selectedInstrument && (
+            {mode === 'watchlist' && selectedInstrument && !isLoading && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -237,7 +254,7 @@ export default function AddInstrumentModal({
                     className="w-full"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Target Price (Optional)
@@ -248,7 +265,7 @@ export default function AddInstrumentModal({
                       value={targetPrice}
                       onChange={(e) => setTargetPrice(e.target.value)}
                       placeholder="Set a target price for alerts"
-                      className="w-full pl-8"
+                      className="w-full pl-10" // Adjusted padding for currency
                       min="0"
                       step="0.01"
                     />
@@ -259,9 +276,9 @@ export default function AddInstrumentModal({
                 </div>
               </>
             )}
-            
+
             {/* Pie specific fields */}
-            {mode === 'pie' && selectedInstrument && (
+            {mode === 'pie' && selectedInstrument && !isLoading && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Target Allocation (%)
@@ -283,20 +300,20 @@ export default function AddInstrumentModal({
                 </div>
               </div>
             )}
-            
+
             {/* Error message */}
             {error && (
               <div className="text-sm text-red-600">
                 {error}
               </div>
             )}
-            
+
             {/* Action buttons */}
             <div className="flex justify-end space-x-3">
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              
+
               {mode === 'watchlist' && onAddToWatchlist && (
                 <Button
                   onClick={handleAddToWatchlist}
@@ -306,7 +323,7 @@ export default function AddInstrumentModal({
                   Add to Watchlist
                 </Button>
               )}
-              
+
               {mode === 'pie' && onAddToPie && (
                 <Button
                   onClick={handleAddToPie}
