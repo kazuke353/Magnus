@@ -1,4 +1,4 @@
-    import { useState } from 'react';
+import { useState } from 'react';
     import { WatchlistItem } from '~/utils/portfolio/types';
     import SortableTable from './SortableTable';
     import Button from './Button';

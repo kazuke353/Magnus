@@ -1,4 +1,4 @@
-    import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
     import { json, LoaderFunctionArgs } from '@remix-run/node';
     import { useLoaderData, useFetcher } from '@remix-run/react';
     import { requireAuthentication } from '~/services/auth.server';

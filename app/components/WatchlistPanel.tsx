@@ -1,4 +1,4 @@
-    import { useState } from 'react';
+import { useState } from 'react';
     import { WatchlistItem, InstrumentSearchResult } from '~/utils/portfolio/types';
     import WatchlistTable from './WatchlistTable';
     import InstrumentSearch from './InstrumentSearch';
